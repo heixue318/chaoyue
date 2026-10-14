@@ -1,0 +1,23 @@
+package com.growthscore.demo.model
+
+enum class ExamKind { COMPREHENSIVE, SUBJECT_TEST }
+data class Student(val name: String, val grade: String, val term: String, val schoolYear: String)
+data class SubjectScore(val subject: String, val score: Double, val fullScore: Double, val lossReasons: List<String> = emptyList()) {
+    val rate: Double get() = score / fullScore * 100
+}
+data class Exam(val id: String, val name: String, val date: String, val kind: ExamKind, val subjectScores: List<SubjectScore>) {
+    val totalScore: Double get() = subjectScores.sumOf { it.score }
+    val totalFullScore: Double get() = subjectScores.sumOf { it.fullScore }
+    val rate: Double get() = totalScore / totalFullScore * 100
+}
+data class SubjectGoal(val subject: String, val target: Double)
+
+fun levelFor(rate: Double): String = when {
+    rate >= 95 -> "卓越突破"
+    rate >= 90 -> "优秀稳定"
+    rate >= 85 -> "良好提升"
+    rate >= 80 -> "稳步成长"
+    rate >= 70 -> "重点提升"
+    rate >= 60 -> "基础加强"
+    else -> "重新夯实"
+}
