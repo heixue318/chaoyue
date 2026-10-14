@@ -27,8 +27,8 @@ import kotlin.math.*
         drawPath(path,color,style=Stroke(4f,cap=StrokeCap.Round)); points.forEachIndexed { index,point -> drawCircle(color,7f,point); drawCircle(Color.White,3f,point); if(labels.isNotEmpty()&&(index==0||index==points.lastIndex||values.size<=5)){paint.textAlign=android.graphics.Paint.Align.CENTER;drawContext.canvas.nativeCanvas.drawText(labels.getOrElse(index){""}.take(6),point.x,bottom+23f,paint)} }
     }
 }
-@Composable fun RadarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier) {
-    Canvas(modifier.size(270.dp)) {
+@Composable fun RadarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier.size(270.dp)) {
+    Canvas(modifier) {
         if(values.size < 3) return@Canvas
         val center=Offset(size.width/2,size.height/2); val radius=size.minDimension*.31f; val count=values.size
         fun point(index:Int,scale:Float):Offset { val angle=-Math.PI.toFloat()/2+2*Math.PI.toFloat()*index/count; return Offset(center.x+cos(angle)*radius*scale,center.y+sin(angle)*radius*scale) }

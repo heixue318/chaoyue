@@ -20,6 +20,7 @@ class LocalStore(context: Context) {
     private fun encode(data: AppData) = JSONObject().apply {
         put("student", JSONObject().apply { put("name", data.student.name); put("grade", data.student.grade); put("term", data.student.term); put("year", data.student.schoolYear) })
         put("subjects", JSONArray(data.subjects))
+        put("fullScores", JSONObject().apply { data.fullScores.forEach { (subject, score) -> put(subject, score) } })
         put("goals", JSONArray().apply { data.goals.forEach { put(JSONObject().apply { put("subject", it.subject); put("target", it.target) }) } })
         put("exams", JSONArray().apply { data.exams.forEach { exam -> put(JSONObject().apply {
             put("id", exam.id); put("name", exam.name); put("date", exam.date); put("kind", exam.kind.name)
@@ -34,6 +35,7 @@ class LocalStore(context: Context) {
         val student = Student(studentJson.getString("name"), studentJson.getString("grade"), studentJson.getString("term"), studentJson.getString("year"))
         fun strings(array: JSONArray) = List(array.length()) { array.getString(it) }
         val subjects = strings(root.getJSONArray("subjects"))
+        val fullScoresJson=root.optJSONObject("fullScores"); val fullScores=subjects.associateWith { fullScoresJson?.optDouble(it,100.0) ?: 100.0 }
         val goals = root.getJSONArray("goals").let { list -> List(list.length()) { i -> list.getJSONObject(i).let { SubjectGoal(it.getString("subject"), it.getDouble("target")) } } }
         val exams = root.getJSONArray("exams").let { list -> List(list.length()) { i -> list.getJSONObject(i).let { item ->
             val scores = item.getJSONArray("scores").let { values -> List(values.length()) { j -> values.getJSONObject(j).let { score ->
@@ -41,8 +43,8 @@ class LocalStore(context: Context) {
             } } }
             Exam(item.getString("id"), item.getString("name"), item.getString("date"), ExamKind.valueOf(item.getString("kind")), scores)
         } } }
-        AppData(student, subjects, exams, goals)
+        AppData(student, subjects, exams, goals, fullScores)
     }
 }
 
-data class AppData(val student: Student, val subjects: List<String>, val exams: List<Exam>, val goals: List<SubjectGoal>)
+data class AppData(val student: Student, val subjects: List<String>, val exams: List<Exam>, val goals: List<SubjectGoal>, val fullScores: Map<String, Double> = emptyMap())
