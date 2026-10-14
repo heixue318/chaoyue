@@ -15,19 +15,19 @@ import com.growthscore.demo.model.*
 import com.growthscore.demo.ui.DemoViewModel
 import java.time.LocalDate
 
-@Composable fun EntryScreen(vm: DemoViewModel) {
+@Composable fun EntryScreen(vm: DemoViewModel, onSaved: () -> Unit) {
     var history by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween) {
             Column { Text("新增综合考试",fontSize=28.sp,fontWeight=FontWeight.Bold); Text("只填本次得分；保存后参与分析",style=MaterialTheme.typography.bodySmall) }
             TextButton({ history=true }) { Text("历史成绩 ${vm.exams.size}/300") }
         }
-        ComprehensiveForm(vm)
+        ComprehensiveForm(vm,onSaved)
     }
     if(history) HistoryDialog(vm) { history=false }
 }
 
-@Composable private fun ComprehensiveForm(vm: DemoViewModel) {
+@Composable private fun ComprehensiveForm(vm: DemoViewModel, onSaved: () -> Unit) {
     val context=LocalContext.current; var name by remember { mutableStateOf("月考") }; var date by remember { mutableStateOf(LocalDate.now()) }
     val scores=remember(vm.subjects) { vm.subjects.associateWith { mutableStateOf("90") } }
     Column(Modifier.padding(top=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -41,7 +41,7 @@ import java.time.LocalDate
             } }
         }
         val sum=scores.values.sumOf { it.value.toDoubleOrNull()?:0.0 }; val total=vm.subjects.sumOf { vm.fullScore(it) }; Text("总分：${sum.toInt()} / ${total.toInt()}    得分率：%.1f%%".format(if(total==0.0)0.0 else sum/total*100),fontWeight=FontWeight.Bold)
-        Button(onClick={ vm.saveExam(Exam("new-${System.currentTimeMillis()}",name.ifBlank{"未命名考试"},date.toString(),ExamKind.COMPREHENSIVE,scores.map { SubjectScore(it.key,it.value.value.toDoubleOrNull()?:0.0,vm.fullScore(it.key)) })); }) { Text("保存考试记录") }
+        Button(onClick={ vm.saveExam(Exam("new-${System.currentTimeMillis()}",name.ifBlank{"未命名考试"},date.toString(),ExamKind.COMPREHENSIVE,scores.map { SubjectScore(it.key,it.value.value.toDoubleOrNull()?:0.0,vm.fullScore(it.key)) })); onSaved() }) { Text("保存并返回首页") }
     }
 }
 

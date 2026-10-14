@@ -30,7 +30,7 @@ import kotlin.math.*
 @Composable fun RadarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier.size(270.dp)) {
     Canvas(modifier) {
         if(values.size < 3) return@Canvas
-        val center=Offset(size.width/2,size.height/2); val radius=size.minDimension*.31f; val count=values.size
+        val center=Offset(size.width/2,size.height/2); val radius=size.minDimension*.33f; val count=values.size
         fun point(index:Int,scale:Float):Offset { val angle=-Math.PI.toFloat()/2+2*Math.PI.toFloat()*index/count; return Offset(center.x+cos(angle)*radius*scale,center.y+sin(angle)*radius*scale) }
         listOf(.2f,.4f,.6f,.8f,1f).forEach { scale ->
             val polygon=Path().apply { moveTo(point(0,scale).x,point(0,scale).y); for(index in 1 until count) lineTo(point(index,scale).x,point(index,scale).y); close() }
@@ -39,7 +39,7 @@ import kotlin.math.*
         values.indices.forEach { drawLine(Color(0xFFB8DDF3),center,point(it,1f),2f) }
         val data=Path().apply { moveTo(point(0,(values[0].second/100).toFloat()).x,point(0,(values[0].second/100).toFloat()).y); for(index in 1 until count) lineTo(point(index,(values[index].second/100).toFloat()).x,point(index,(values[index].second/100).toFloat()).y); close() }
         drawPath(data,Blue.copy(alpha=.25f)); drawPath(data,Blue,style=Stroke(3f))
-        val paint=android.graphics.Paint().apply { this.color=android.graphics.Color.DKGRAY; textSize=24f; textAlign=android.graphics.Paint.Align.CENTER }
+        val paint=android.graphics.Paint().apply { this.color=android.graphics.Color.DKGRAY; textSize=(size.minDimension*.055f).coerceAtMost(28f); textAlign=android.graphics.Paint.Align.CENTER }
         values.forEachIndexed { index,pair -> val anchor=point(index,1.22f); drawContext.canvas.nativeCanvas.drawText(pair.first,anchor.x,anchor.y-8f,paint); drawContext.canvas.nativeCanvas.drawText(pair.second.toInt().toString(),anchor.x,anchor.y+20f,paint) }
     }
 }

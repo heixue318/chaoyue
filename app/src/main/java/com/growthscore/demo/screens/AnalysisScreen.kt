@@ -1,6 +1,8 @@
 package com.growthscore.demo.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -22,7 +24,7 @@ fun AnalysisScreen(vm: DemoViewModel) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试分析") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长分析") })
         }
-        if (tab == 0) OverallAnalysis(vm) else SingleSubjectAnalysis(vm)
+        Box(Modifier.weight(1f)) { if (tab == 0) OverallAnalysis(vm) else SingleSubjectAnalysis(vm) }
     }
 }
 
@@ -30,13 +32,13 @@ fun AnalysisScreen(vm: DemoViewModel) {
 private fun OverallAnalysis(vm: DemoViewModel) {
     val latest = vm.latest
     var selected by remember { mutableStateOf(vm.exams.lastIndex) }
-    Column(Modifier.fillMaxSize().padding(top = 18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.fillMaxSize().padding(top = 18.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Column(Modifier.fillMaxWidth()) {
             Card { Column(Modifier.padding(20.dp)) { Text("当前综合得分率"); Text("%.1f%%".format(latest.rate), fontSize = 42.sp); Text(levelFor(latest.rate), color = Green) } }
             Card(Modifier.fillMaxWidth().padding(top = 16.dp)) { Column(Modifier.padding(20.dp)) { Text("综合成长曲线（横轴：考试 · 纵轴：得分率 %）"); LineChart(vm.exams.map { it.rate },labels=vm.exams.map{it.name},onPointClick={selected=it}); val exam=vm.exams[selected]; Text("已选：${exam.name} · ${exam.date} · %.1f%%".format(exam.rate),color=Green,fontWeight=FontWeight.Bold) } }
         }
         Column(Modifier.fillMaxWidth()) {
-            Card { BoxWithConstraints(Modifier.fillMaxWidth()) { val chartWidth=maxWidth; Column(Modifier.padding(20.dp)) { Text("学科能力雷达图（学科 · 得分率）"); RadarChart(latest.subjectScores.map { it.subject to it.rate },Modifier.size((chartWidth-40.dp).coerceAtMost(460.dp))) } } }
+            Card { Column(Modifier.padding(20.dp)) { Text("学科能力雷达图（学科 · 得分率）"); RadarChart(latest.subjectScores.map { it.subject to it.rate },Modifier.fillMaxWidth().aspectRatio(1f)) } }
             Card(Modifier.fillMaxWidth().padding(top = 16.dp)) { Column(Modifier.padding(20.dp)) { Text("本次报告"); Text("数学保持优势；英语为主要提升方向，建议加强词汇与阅读训练。") } }
         }
     }
