@@ -14,12 +14,14 @@ import com.growthscore.demo.components.RadarChart
 import com.growthscore.demo.model.levelFor
 import com.growthscore.demo.ui.DemoViewModel
 import com.growthscore.demo.ui.Green
+import com.growthscore.demo.ui.LocalCompactLayout
 
 @Composable
 fun AnalysisScreen(vm: DemoViewModel) {
+    val compact=LocalCompactLayout.current
     var tab by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("分析中心", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+    Column(Modifier.fillMaxSize().padding(if(compact)8.dp else 16.dp)) {
+        Text("分析中心", fontSize = if(compact)22.sp else 28.sp, fontWeight = FontWeight.Bold)
         TabRow(selectedTabIndex = tab) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试分析") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长分析") })

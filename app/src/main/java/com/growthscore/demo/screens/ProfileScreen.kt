@@ -15,11 +15,13 @@ import android.net.Uri
 import com.growthscore.demo.ui.DemoViewModel
 import com.growthscore.demo.ui.UpdateStatus
 import com.growthscore.demo.ui.DownloadStatus
+import com.growthscore.demo.ui.LocalCompactLayout
 
 @Composable fun ProfileScreen(vm: DemoViewModel) {
+    val compact=LocalCompactLayout.current
     var help by remember { mutableStateOf(false) }; var studentEdit by remember { mutableStateOf(false) }; var subjectEdit by remember { mutableStateOf(false) }; var update by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        Text("我的",fontSize=28.sp,fontWeight=FontWeight.Bold)
+    Column(Modifier.fillMaxSize().padding(if(compact)8.dp else 16.dp).verticalScroll(rememberScrollState()), verticalArrangement=Arrangement.spacedBy(if(compact)8.dp else 14.dp)) {
+        Text("我的",fontSize=if(compact)22.sp else 28.sp,fontWeight=FontWeight.Bold)
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             if(maxWidth>=760.dp) Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) { InfoCards(vm,{studentEdit=true},{subjectEdit=true}) }
             else Column(verticalArrangement=Arrangement.spacedBy(12.dp)) { InfoCards(vm,{studentEdit=true},{subjectEdit=true}) }

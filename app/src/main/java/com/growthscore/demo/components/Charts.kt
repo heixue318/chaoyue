@@ -11,13 +11,14 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.growthscore.demo.ui.Blue
 import kotlin.math.*
 
-@Composable fun LineChart(values: List<Double>, modifier: Modifier = Modifier, color: Color = Blue, labels: List<String> = emptyList(), onPointClick: ((Int) -> Unit)? = null) {
+@Composable fun LineChart(values: List<Double>, modifier: Modifier = Modifier, color: Color = Blue, labels: List<String> = emptyList(), onPointClick: ((Int) -> Unit)? = null, chartHeight: Dp = 180.dp) {
     val min=70f; val max=100f
-    Canvas(modifier.height(180.dp).fillMaxWidth().pointerInput(values) { detectTapGestures { tap -> if(values.size>1 && onPointClick!=null) { val left=48f; val step=(size.width-left)/(values.size-1); onPointClick((((tap.x-left)/step).roundToInt()).coerceIn(0,values.lastIndex)) } } }) {
+    Canvas(modifier.fillMaxWidth().height(chartHeight).pointerInput(values) { detectTapGestures { tap -> if(values.size>1 && onPointClick!=null) { val left=48f; val step=(size.width-left)/(values.size-1); onPointClick((((tap.x-left)/step).roundToInt()).coerceIn(0,values.lastIndex)) } } }) {
         if(values.size<2) return@Canvas
         val left=48f; val top=12f; val bottom=size.height-28f; val step=(size.width-left)/(values.size-1)
         val paint=android.graphics.Paint().apply { this.color=android.graphics.Color.rgb(102,112,128); textSize=22f; textAlign=android.graphics.Paint.Align.RIGHT }

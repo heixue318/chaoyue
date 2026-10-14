@@ -13,13 +13,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.growthscore.demo.model.*
 import com.growthscore.demo.ui.DemoViewModel
+import com.growthscore.demo.ui.LocalCompactLayout
 import java.time.LocalDate
 
 @Composable fun EntryScreen(vm:DemoViewModel,onSaved:()->Unit){
+    val compact=LocalCompactLayout.current
     var showEditor by remember{mutableStateOf(false)};var filter by remember{mutableStateOf("")};var selectedId by remember{mutableStateOf(vm.exams.last().id)};var deleteId by remember{mutableStateOf<String?>(null)}
     val records=vm.exams.asReversed().filter{filter.isBlank()||it.date.contains(filter)};val selected=vm.exams.find{it.id==selectedId}?:records.firstOrNull()
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Column{Text("成绩录入",fontSize=28.sp,fontWeight=FontWeight.Bold);Text("历史成绩最多保存 300 场",style=MaterialTheme.typography.bodySmall)};Button({showEditor=true}){Text("录入成绩")}}
+    Column(Modifier.fillMaxSize().padding(if(compact)8.dp else 16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(if(compact)6.dp else 12.dp)){
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Column{Text("成绩录入",fontSize=if(compact)22.sp else 28.sp,fontWeight=FontWeight.Bold);Text("历史成绩最多保存 300 场",style=MaterialTheme.typography.bodySmall)};Button({showEditor=true}){Text("录入成绩")}}
         Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){Text("按日期筛选",fontWeight=FontWeight.Bold);OutlinedTextField(filter,{filter=it},label={Text("输入日期，如 2026-10 或 2026-10-14")},singleLine=true,modifier=Modifier.fillMaxWidth());if(filter.isNotBlank())TextButton({filter=""}){Text("清除筛选")}}}
         Text("历史成绩（${records.size} 场）",fontSize=20.sp,fontWeight=FontWeight.Bold)
         if(records.isEmpty())Text("没有匹配日期的成绩记录。")
