@@ -1,11 +1,13 @@
 package com.growthscore.demo.screens
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -13,21 +15,45 @@ import com.growthscore.demo.model.*
 import com.growthscore.demo.ui.DemoViewModel
 import java.time.LocalDate
 
+private val lossReasons = listOf("粗心", "未完成试卷", "题目难", "知识点遗忘", "审题偏差", "计算失误", "时间不足")
+
 @Composable fun EntryScreen(vm: DemoViewModel) {
-    var kind by remember { mutableStateOf(ExamKind.COMPREHENSIVE) }; var saved by remember { mutableStateOf(false) }
+    var history by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-        Text("新增成绩",fontSize=28.sp,fontWeight=FontWeight.Bold); Text("选择考试类型，录入后会立即参与分析",color=androidx.compose.ui.graphics.Color.Gray)
-        Row(Modifier.padding(top=16.dp)) { FilterChip(selected=kind==ExamKind.COMPREHENSIVE,onClick={kind=ExamKind.COMPREHENSIVE},label={Text("综合考试")}); Spacer(Modifier.width(10.dp)); FilterChip(selected=kind==ExamKind.SUBJECT_TEST,onClick={kind=ExamKind.SUBJECT_TEST},label={Text("单科测试")}) }
-        if(kind==ExamKind.COMPREHENSIVE) ComprehensiveForm(vm,{saved=true}) else SubjectTestForm(vm,{saved=true})
-        if(saved) Text("已保存到本地 DEMO 数据，可前往分析页面查看。",color=com.growthscore.demo.ui.Green,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween) {
+            Column { Text("新增综合考试",fontSize=28.sp,fontWeight=FontWeight.Bold); Text("只填本次得分；保存后参与分析",style=MaterialTheme.typography.bodySmall) }
+            TextButton({ history=true }) { Text("历史成绩 ${vm.exams.size}/300") }
+        }
+        ComprehensiveForm(vm)
+    }
+    if(history) HistoryDialog(vm) { history=false }
+}
+
+@Composable private fun ComprehensiveForm(vm: DemoViewModel) {
+    val context=LocalContext.current; var name by remember { mutableStateOf("月考") }; var date by remember { mutableStateOf(LocalDate.now()) }
+    val scores=remember(vm.subjects) { vm.subjects.associateWith { mutableStateOf("90") } }
+    val selectedReasons=remember(vm.subjects) { mutableStateMapOf<String,Set<String>>().also { map -> vm.subjects.forEach { map[it]=emptySet() } } }
+    Column(Modifier.padding(top=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        ScoreField("考试名称",name,{name=it})
+        OutlinedButton(onClick={ DatePickerDialog(context,{_,year,month,day->date=LocalDate.of(year,month+1,day)},date.year,date.monthValue-1,date.dayOfMonth).show() },modifier=Modifier.fillMaxWidth()) { Text("考试日期：$date  ·  选择年月日") }
+        Text("科目成绩",fontSize=20.sp,fontWeight=FontWeight.Bold)
+        vm.subjects.forEach { subject ->
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
+                Text(subject,fontWeight=FontWeight.Bold)
+                OutlinedTextField(scores.getValue(subject).value,{scores.getValue(subject).value=it},label={Text("本次成绩")},singleLine=true,modifier=Modifier.fillMaxWidth())
+                Text("常见丢分原因（可多选）",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=6.dp))
+                lossReasons.chunked(3).forEach { row -> Row { row.forEach { reason -> FilterChip(selected=reason in selectedReasons.getValue(subject),onClick={selectedReasons[subject]=if(reason in selectedReasons.getValue(subject))selectedReasons.getValue(subject)-reason else selectedReasons.getValue(subject)+reason},label={Text(reason)},modifier=Modifier.padding(end=5.dp)) } } }
+            } }
+        }
+        val sum=scores.values.sumOf { it.value.toDoubleOrNull()?:0.0 }; Text("总分：${sum.toInt()} / ${scores.size*100}    得分率：%.1f%%".format(if(scores.isEmpty())0.0 else sum/scores.size),fontWeight=FontWeight.Bold)
+        Button(onClick={ vm.saveExam(Exam("new-${System.currentTimeMillis()}",name.ifBlank{"未命名考试"},date.toString(),ExamKind.COMPREHENSIVE,scores.map { SubjectScore(it.key,it.value.value.toDoubleOrNull()?:0.0,100.0,selectedReasons.getValue(it.key).toList()) })); }) { Text("保存考试记录") }
     }
 }
-@Composable private fun ComprehensiveForm(vm:DemoViewModel,onSaved:()->Unit){
-    var name by remember { mutableStateOf("月考") }; var lossReasons by remember { mutableStateOf(setOf<String>()) }; val values=remember(vm.subjects){vm.subjects.associateWith { mutableStateOf("90") }}
-    Column(Modifier.padding(top=18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) { Field("考试名称",name,{name=it},Modifier.fillMaxWidth()); Field("考试日期",LocalDate.now().toString(),{},Modifier.fillMaxWidth(),enabled=false); Field("年级",vm.student.grade,{},Modifier.fillMaxWidth(),enabled=false); Field("学期",vm.student.term,{},Modifier.fillMaxWidth(),enabled=false) }
-    Text("科目成绩",fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=20.dp)); vm.subjects.chunked(2).forEach { row -> Row(horizontalArrangement=Arrangement.spacedBy(12.dp),modifier=Modifier.fillMaxWidth()){row.forEach{s->Column(Modifier.weight(1f)){Text(s);OutlinedTextField(value=values.getValue(s).value,onValueChange={values.getValue(s).value=it},suffix={Text("/100")},singleLine=true,modifier=Modifier.fillMaxWidth());Text("得分率：${values.getValue(s).value}%",fontSize=12.sp)}}} }
-    Text("主要失分原因（可多选）",fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=14.dp)); Row { listOf("知识点不会","计算错误","审题错误","时间不足","粗心","其他").forEach { reason -> FilterChip(selected=reason in lossReasons,onClick={lossReasons=if(reason in lossReasons) lossReasons-reason else lossReasons+reason},label={Text(reason)},modifier=Modifier.padding(end=6.dp)) } }
-    val sum=values.values.sumOf{it.value.toDoubleOrNull()?:0.0}; Text("总分：${sum.toInt()} / ${values.size * 100}    综合得分率：%.1f%%".format(if(values.isEmpty())0.0 else sum/values.size),fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=18.dp)); Button(onClick={vm.saveExam(Exam("new-${System.currentTimeMillis()}",name,LocalDate.now().toString(),ExamKind.COMPREHENSIVE,values.map{SubjectScore(it.key,it.value.value.toDoubleOrNull()?:0.0,100.0,lossReasons.toList())}));onSaved()},modifier=Modifier.padding(top=12.dp)){Text("保存考试记录")}
+
+@Composable private fun HistoryDialog(vm: DemoViewModel, dismiss:()->Unit) {
+    var pending by remember { mutableStateOf<String?>(null) }
+    AlertDialog(onDismissRequest=dismiss,title={Text("历史成绩 · ${vm.exams.size}/300")},text={Column(Modifier.heightIn(max=460.dp).verticalScroll(rememberScrollState())) { vm.exams.asReversed().forEach { exam -> Row(Modifier.fillMaxWidth().padding(vertical=6.dp),horizontalArrangement=Arrangement.SpaceBetween) { Column(Modifier.weight(1f)) { Text(exam.name,fontWeight=FontWeight.Bold); Text("${exam.date} · %.1f%%".format(exam.rate),style=MaterialTheme.typography.bodySmall) }; TextButton({pending=exam.id}) { Text("删除") } } } }},confirmButton={TextButton(dismiss){Text("关闭")}})
+    pending?.let { id -> AlertDialog(onDismissRequest={pending=null},title={Text("删除这场成绩？")},text={Text("删除后无法恢复。")},confirmButton={TextButton({vm.deleteExam(id);pending=null}){Text("删除")}},dismissButton={TextButton({pending=null}){Text("取消")}}) }
 }
-@Composable private fun SubjectTestForm(vm:DemoViewModel,onSaved:()->Unit){ var name by remember{mutableStateOf("单科测试")};var subject by remember(vm.subjects){mutableStateOf(vm.subjects.firstOrNull()?:"")};var score by remember{mutableStateOf("45")};var full by remember{mutableStateOf("50")};Column(Modifier.padding(top=18.dp).widthIn(max=700.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Field("考试名称",name,{name=it});Text("选择科目",fontWeight=FontWeight.Bold); vm.subjects.chunked(4).forEach { row -> Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){row.forEach{ item -> FilterChip(selected=subject==item,onClick={subject=item},label={Text(item)})}} };Field("自定义科目",subject,{subject=it});Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){Field("成绩",score,{score=it},Modifier.weight(1f));Field("满分",full,{full=it},Modifier.weight(1f))};val rate=(score.toDoubleOrNull()?:0.0)/(full.toDoubleOrNull()?:1.0)*100;Text("得分率：%.1f%%".format(rate),fontWeight=FontWeight.Bold);Button(onClick={vm.saveExam(Exam("test-${System.currentTimeMillis()}",name,LocalDate.now().toString(),ExamKind.SUBJECT_TEST,listOf(SubjectScore(subject,score.toDoubleOrNull()?:0.0,full.toDoubleOrNull()?:100.0))));onSaved()}){Text("保存单科测试")}} }
-@Composable private fun Field(label:String,value:String,onChange:(String)->Unit,modifier:Modifier=Modifier,enabled:Boolean=true)=OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},singleLine=true,enabled=enabled,modifier=modifier)
+
+@Composable private fun ScoreField(label:String,value:String,onChange:(String)->Unit)=OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},singleLine=true,modifier=Modifier.fillMaxWidth())

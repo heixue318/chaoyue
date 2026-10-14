@@ -25,7 +25,8 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     val currentVersion = BuildConfig.VERSION_NAME
     var updateStatus by mutableStateOf<UpdateStatus>(UpdateStatus.Idle); private set
     private fun persist(next: AppData) { data = next; store.save(next) }
-    fun saveExam(exam: Exam) { persist(data.copy(exams = data.exams + exam)) }
+    fun saveExam(exam: Exam) { persist(data.copy(exams = (data.exams + exam).takeLast(300))) }
+    fun deleteExam(id: String) { if (data.exams.size > 1) persist(data.copy(exams = data.exams.filterNot { it.id == id })) }
     fun updateGoal(subject: String, target: Double) { persist(data.copy(goals = data.goals.map { if (it.subject == subject) it.copy(target = target) else it })) }
     fun updateStudent(name: String, grade: String, term: String, year: String) { persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" }))) }
     fun updateSubjects(items: List<String>) {
