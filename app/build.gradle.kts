@@ -18,8 +18,8 @@ android {
         applicationId = "com.growthscore.demo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0-demo"
+        versionCode = 3
+        versionName = "1.2.0"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -54,5 +54,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
