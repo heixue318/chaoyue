@@ -1,13 +1,18 @@
 package com.growthscore.demo.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,34 +25,47 @@ import com.growthscore.demo.ui.LocalCompactLayout
 import kotlin.math.ceil
 
 @Composable
-fun AnalysisScreen(vm: DemoViewModel) {
+fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Boolean) -> Unit) {
     val compact=LocalCompactLayout.current
     var tab by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize().padding(if(compact)8.dp else 16.dp)) {
-        Text("分析中心", fontSize = if(compact)22.sp else 28.sp, fontWeight = FontWeight.Bold)
-        TabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长") })
-            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("目标差距") })
-            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("阶段报告") })
-            Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("考试对比") })
+    BackHandler(enabled=immersive) { onImmersiveChange(false) }
+    Box(Modifier.fillMaxSize().pointerInput(immersive) { detectTapGestures(onDoubleTap={ onImmersiveChange(!immersive) }) }) {
+        Column(Modifier.fillMaxSize().padding(if(immersive) 0.dp else if(compact)8.dp else 16.dp)) {
+            if(!immersive) {
+                Text("分析中心", fontSize = if(compact)22.sp else 28.sp, fontWeight = FontWeight.Bold)
+                ScrollableTabRow(selectedTabIndex = tab,edgePadding=0.dp) {
+                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试") })
+                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长") })
+                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("目标差距") })
+                    Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("阶段报告") })
+                    Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("考试对比") })
+                }
+            }
+            Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); 2->GoalGapAnalysis(vm); 3->PhaseReport(vm); else->ExamCompare(vm) } }
         }
-        Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); 2->GoalGapAnalysis(vm); 3->PhaseReport(vm); else->ExamCompare(vm) } }
+        if(immersive) IconButton(onClick={onImmersiveChange(false)},modifier=Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp)) { Icon(Icons.Default.FullscreenExit,"退出全屏") }
     }
 }
 
 @Composable private fun OverallAnalysis(vm: DemoViewModel) {
+    val compact=LocalCompactLayout.current
     val latest = vm.latest; var selected by remember { mutableStateOf(vm.exams.lastIndex) }
-    Column(Modifier.fillMaxSize().padding(top = 18.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    val summary:@Composable ()->Unit = {
         Column(Modifier.fillMaxWidth()) {
             Card { Column(Modifier.padding(20.dp)) { Text("当前综合得分率"); Text(formatRate(latest.rate), fontSize = 42.sp); Text(levelFor(latest.rate), color = Green) } }
             Card(Modifier.fillMaxWidth().padding(top = 16.dp)) { Column(Modifier.padding(20.dp)) { Text("综合成长曲线（横轴：考试 · 纵轴：得分率 %）"); LineChart(vm.exams.map { it.rate },labels=vm.exams.map{it.name},onPointClick={selected=it}); val exam=vm.exams[selected]; Text("已选：${exam.name} · ${exam.date} · ${formatRate(exam.rate)}",color=Green,fontWeight=FontWeight.Bold) } }
         }
+    }
+    val radar:@Composable ()->Unit = {
         Column(Modifier.fillMaxWidth()) {
-            Card { Column(Modifier.padding(20.dp)) { Text("学科能力雷达图（学科 · 得分率）"); RadarChart(latest.subjectScores.map { it.subject to it.rate },Modifier.fillMaxWidth().aspectRatio(1f)) } }
+            Card { Column(Modifier.padding(if(compact)12.dp else 20.dp)) { Text("学科能力雷达图（学科 · 得分率）"); RadarChart(latest.subjectScores.map { it.subject to it.rate },if(compact) Modifier.fillMaxWidth().height(250.dp) else Modifier.fillMaxWidth().aspectRatio(1f),compactLandscape=compact) } }
             Card(Modifier.fillMaxWidth().padding(top = 16.dp)) { Column(Modifier.padding(20.dp)) { Text("本次报告"); Text("可在“目标差距”中按差距或失分数查看本次考试的学科情况。") } }
         }
     }
+    if(compact) Row(Modifier.fillMaxSize().padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { summary() }
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { radar() }
+    } else Column(Modifier.fillMaxSize().padding(top = 18.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) { summary(); radar() }
 }
 
 @Composable private fun GoalGapAnalysis(vm: DemoViewModel) {
