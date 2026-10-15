@@ -2,14 +2,20 @@ package com.growthscore.demo.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +39,7 @@ import com.growthscore.demo.ui.UpdateStatus
         }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) { OutlinedButton({help=true}){Text("帮助中心")}; OutlinedButton({update=true}){Text("检查更新")} }
         Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("数据备份与恢复",fontSize=19.sp,fontWeight=FontWeight.Bold);Text("导出完整成绩、当次满分、学科设置和目标到设备“下载”文件夹。恢复前会校验备份文件。",style=MaterialTheme.typography.bodySmall);Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){TextButton({backupMessage=vm.exportBackup().getOrElse { "导出失败：${it.message}" }}){Text("导出 CSV")};TextButton({importBackup.launch(arrayOf("text/*","text/csv"))}){Text("导入备份")}} } }
+        Text("v${vm.currentVersion}  ·  作者：风乱吹  ·  仅供交流学习使用",modifier=Modifier.fillMaxWidth(),textAlign=androidx.compose.ui.text.style.TextAlign.Center,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if(studentEdit) StudentDialog(vm){studentEdit=false}
     if(subjectEdit) SubjectsDialog(vm){subjectEdit=false}
@@ -45,7 +52,7 @@ import com.growthscore.demo.ui.UpdateStatus
 @Composable private fun RowScope.InfoCards(vm:DemoViewModel,editStudent:()->Unit,editSubjects:()->Unit) = InfoCardsBody(vm,editStudent,editSubjects,Modifier.weight(1f),Modifier.weight(1f),Modifier.weight(1f))
 @Composable private fun ColumnScope.InfoCards(vm:DemoViewModel,editStudent:()->Unit,editSubjects:()->Unit) = InfoCardsBody(vm,editStudent,editSubjects,Modifier.fillMaxWidth(),Modifier.fillMaxWidth(),Modifier.fillMaxWidth())
 @Composable private fun InfoCardsBody(vm:DemoViewModel,editStudent:()->Unit,editSubjects:()->Unit,studentModifier:Modifier,subjectsModifier:Modifier,dataModifier:Modifier) {
-    Card(studentModifier) { Column(Modifier.padding(16.dp)) { Text("学生信息",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("姓名：${vm.student.name}"); Text("${vm.student.grade} · ${vm.student.term}"); Text(vm.student.schoolYear); TextButton(editStudent){Text("编辑资料")} } }
+    Card(studentModifier) { Row(Modifier.padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween) { Column(Modifier.weight(1f)) { Text("学生信息",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("姓名：${vm.student.name}"); Text("${vm.student.grade} · ${vm.student.term}"); Text(vm.student.schoolYear); TextButton(editStudent){Text("编辑资料")} }; StudentAvatar(vm.student.avatarUri,Modifier.size(72.dp)) } }
     Card(subjectsModifier) { Column(Modifier.padding(16.dp)) { Text("学科设置",fontSize=19.sp,fontWeight=FontWeight.Bold); Text(vm.subjects.joinToString("、")); Text("可设置满分与学习目标",style=MaterialTheme.typography.bodySmall); TextButton(editSubjects){Text("管理学科与目标")} } }
     Card(dataModifier) { Column(Modifier.padding(16.dp)) { Text("本地数据",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("资料、学科、目标和成绩仅保存在本机。") } }
 }
@@ -53,8 +60,11 @@ import com.growthscore.demo.ui.UpdateStatus
 @Composable private fun StudentDialog(vm:DemoViewModel,dismiss:()->Unit) {
     var name by remember{mutableStateOf(vm.student.name)}; var grade by remember{mutableStateOf(vm.student.grade)}
     var term by remember{mutableStateOf(vm.student.term)}; var year by remember{mutableStateOf(vm.student.schoolYear)}
-    AlertDialog(onDismissRequest=dismiss,title={Text("编辑学生信息")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){Text("保存后仅写入本机，不会上传。",style=MaterialTheme.typography.bodySmall);EditField("姓名",name){name=it};EditField("年级",grade){grade=it};EditField("学期",term){term=it};EditField("学年",year){year=it}}},confirmButton={TextButton({vm.updateStudent(name,grade,term,year);dismiss()}){Text("保存")}},dismissButton={TextButton(dismiss){Text("取消")}})
+    var avatar by remember{mutableStateOf(vm.student.avatarUri)}; val context=LocalContext.current; val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->if(uri!=null){runCatching{context.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)};avatar=uri.toString()}}
+    AlertDialog(onDismissRequest=dismiss,title={Text("编辑学生信息")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){StudentAvatar(avatar,Modifier.size(76.dp).clickable{picker.launch(arrayOf("image/*"))});TextButton({picker.launch(arrayOf("image/*"))}){Text("选择头像")}};Text("保存后仅写入本机，不会上传。",style=MaterialTheme.typography.bodySmall);EditField("姓名",name){name=it};EditField("年级",grade){grade=it};EditField("学期",term){term=it};EditField("学年",year){year=it}}},confirmButton={TextButton({vm.updateStudent(name,grade,term,year,avatar);dismiss()}){Text("保存")}},dismissButton={TextButton(dismiss){Text("取消")}})
 }
+
+@Composable private fun StudentAvatar(uri:String,modifier:Modifier=Modifier){val context=LocalContext.current;val bitmap=remember(uri){runCatching{context.contentResolver.openInputStream(Uri.parse(uri))?.use{BitmapFactory.decodeStream(it)} }.getOrNull()};Box(modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),contentAlignment=androidx.compose.ui.Alignment.Center){if(bitmap!=null) androidx.compose.foundation.Image(bitmap.asImageBitmap(),"学生头像",Modifier.fillMaxSize()) else Text("头像",style=MaterialTheme.typography.labelSmall)}}
 
 @Composable private fun SubjectsDialog(vm:DemoViewModel,dismiss:()->Unit) {
     val defaults=listOf("语文","数学","英语","物理","化学","历史","地理","生物","道德与法治")

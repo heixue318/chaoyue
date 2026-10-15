@@ -23,6 +23,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.BitmapFactory
+import android.graphics.RectF
 import com.growthscore.demo.model.formatRate
 import kotlinx.coroutines.delay
 
@@ -54,15 +56,16 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
         require(records.isNotEmpty()) { "没有可导出的综合考试数据" }
         val width=1080; val height=1500; val bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888); val canvas=Canvas(bitmap); canvas.drawColor(Color.WHITE)
         val title=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.rgb(20,38,77); textSize=54f; isFakeBoldText=true }; val body=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.rgb(45,58,85); textSize=34f }; val subtle=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.rgb(102,112,128); textSize=26f }; val blue=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.rgb(76,111,235); strokeWidth=6f; style=Paint.Style.STROKE }
-        canvas.drawText("我的阶段成长报告",64f,105f,title);canvas.drawText(range,64f,150f,subtle); val avg=records.map{it.rate}.average(); val delta=records.last().rate-records.first().rate; canvas.drawText("综合平均得分率  ${formatRate(avg)}",64f,235f,title);canvas.drawText("首末变化  ${if(delta>=0)"+" else ""}${"%.1f".format(delta)} 个百分点",64f,290f,body);canvas.drawText("综合成绩变化",64f,380f,title)
+        val context=getApplication<Application>(); if(data.student.avatarUri.isNotBlank()){runCatching{context.contentResolver.openInputStream(Uri.parse(data.student.avatarUri))?.use{BitmapFactory.decodeStream(it)}}.getOrNull()?.let{avatar->canvas.save();canvas.clipPath(android.graphics.Path().apply{addCircle(950f,95f,58f,android.graphics.Path.Direction.CW)});canvas.drawBitmap(avatar,null,RectF(892f,37f,1008f,153f),null);canvas.restore()}}
+        canvas.drawText("我的阶段成长报告",64f,105f,title);canvas.drawText("${data.student.name} · ${data.student.schoolYear} ${data.student.term} · $range",64f,150f,subtle); val avg=records.map{it.rate}.average(); val delta=records.last().rate-records.first().rate; canvas.drawText("综合平均得分率  ${formatRate(avg)}",64f,235f,title);canvas.drawText("首末变化  ${if(delta>=0)"+" else ""}${"%.1f".format(delta)} 个百分点",64f,290f,body);canvas.drawText("综合成绩变化",64f,380f,title)
         val left=100f; val top=440f; val right=980f; val bottom=900f; listOf(70,80,90,100).forEach { tick->val y=bottom-(tick-70)/30f*(bottom-top);canvas.drawLine(left,y,right,y,Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.rgb(228,234,244)});canvas.drawText("$tick%",20f,y+8f,subtle) }; val points=records.mapIndexed { index,exam->android.graphics.PointF(left+(right-left)*index/(records.size-1).coerceAtLeast(1),bottom-((exam.rate-70)/30).toFloat().coerceIn(0f,1f)*(bottom-top)) }; points.zipWithNext().forEach{(a,b)->canvas.drawLine(a.x,a.y,b.x,b.y,blue)};points.forEach{canvas.drawCircle(it.x,it.y,8f,Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.rgb(76,111,235)})}
         canvas.drawText("成长总结",64f,1020f,title);canvas.drawText(if(records.size<2)"仅有 1 次综合考试，暂不生成趋势判断。" else "本阶段首末综合得分率变化 ${if(delta>=0)"提高" else "下降"} ${"%.1f".format(kotlin.math.abs(delta))} 个百分点。",64f,1080f,body);canvas.drawText("不同试卷难度会影响结果，不直接据此判断学习能力变化。",64f,1140f,subtle);canvas.drawText("统计口径：综合考试按日期排序，平均值为各场得分率算术平均。",64f,1190f,subtle)
-        val context=getApplication<Application>(); val values=ContentValues().apply { put(MediaStore.Downloads.DISPLAY_NAME,"chaoyue-phase-report-${System.currentTimeMillis()}.png");put(MediaStore.Downloads.MIME_TYPE,"image/png");put(MediaStore.Downloads.IS_PENDING,1) };val uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values)?:error("无法创建图片文件");context.contentResolver.openOutputStream(uri)?.use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}?:error("无法写入图片");values.clear();values.put(MediaStore.Downloads.IS_PENDING,0);context.contentResolver.update(uri,values,null,null);"报告图片已导出到设备的“下载”文件夹"
+        val values=ContentValues().apply { put(MediaStore.Downloads.DISPLAY_NAME,"chaoyue-phase-report-${System.currentTimeMillis()}.png");put(MediaStore.Downloads.MIME_TYPE,"image/png");put(MediaStore.Downloads.IS_PENDING,1) };val uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values)?:error("无法创建图片文件");context.contentResolver.openOutputStream(uri)?.use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}?:error("无法写入图片");values.clear();values.put(MediaStore.Downloads.IS_PENDING,0);context.contentResolver.update(uri,values,null,null);"报告图片已导出到设备的“下载”文件夹"
     }
     fun updateGoals(values: Map<String, Double>, term: String = "当前学期", enabled: Boolean = true) {
         persist(data.copy(goals = data.subjects.map { subject -> SubjectGoal(subject, (values[subject] ?: 90.0).coerceIn(0.0, 100.0), term, enabled) }))
     }
-    fun updateStudent(name: String, grade: String, term: String, year: String) { persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" }))) }
+    fun updateStudent(name: String, grade: String, term: String, year: String, avatarUri:String=data.student.avatarUri) { persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" },avatarUri))) }
     fun updateSubjects(items: List<String>) {
         val clean = items.map(String::trim).filter(String::isNotBlank).distinct()
         if (clean.isNotEmpty()) persist(data.copy(subjects = clean, goals = clean.map { subject -> SubjectGoal(subject, data.goals.find { it.subject == subject }?.target ?: 90.0) }, fullScores=clean.associateWith { data.fullScores[it] ?: 100.0 }))

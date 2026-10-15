@@ -1,7 +1,7 @@
 package com.growthscore.demo.model
 
 enum class ExamKind { COMPREHENSIVE, SUBJECT_TEST }
-data class Student(val name: String, val grade: String, val term: String, val schoolYear: String)
+data class Student(val name: String, val grade: String, val term: String, val schoolYear: String, val avatarUri: String = "")
 data class LossRecord(val reason: String, val points: Double)
 data class SubjectScore(val subject: String, val score: Double, val fullScore: Double, val lossReasons: List<String> = emptyList(), val losses: List<LossRecord> = emptyList()) {
     val rate: Double get() = score / fullScore * 100

@@ -28,7 +28,7 @@ class LocalStore(context: Context) {
     }
 
     private fun encode(data: AppData) = JSONObject().apply {
-        put("student", JSONObject().apply { put("name", data.student.name); put("grade", data.student.grade); put("term", data.student.term); put("year", data.student.schoolYear) })
+        put("student", JSONObject().apply { put("name", data.student.name); put("grade", data.student.grade); put("term", data.student.term); put("year", data.student.schoolYear); put("avatarUri",data.student.avatarUri) })
         put("subjects", JSONArray(data.subjects))
         put("fullScores", JSONObject().apply { data.fullScores.forEach { (subject, score) -> put(subject, score) } })
         put("goals", JSONArray().apply { data.goals.forEach { put(JSONObject().apply { put("subject", it.subject); put("target", it.target); put("term", it.term); put("enabled", it.enabled) }) } })
@@ -42,7 +42,7 @@ class LocalStore(context: Context) {
 
     private fun decode(raw: String): AppData = JSONObject(raw).let { root ->
         val studentJson = root.getJSONObject("student")
-        val student = Student(studentJson.getString("name"), studentJson.getString("grade"), studentJson.getString("term"), studentJson.getString("year"))
+        val student = Student(studentJson.getString("name"), studentJson.getString("grade"), studentJson.getString("term"), studentJson.getString("year"),studentJson.optString("avatarUri", ""))
         fun strings(array: JSONArray) = List(array.length()) { array.getString(it) }
         val subjects = strings(root.getJSONArray("subjects"))
         val fullScoresJson=root.optJSONObject("fullScores"); val fullScores=subjects.associateWith { fullScoresJson?.optDouble(it,100.0) ?: 100.0 }
