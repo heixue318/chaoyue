@@ -2,6 +2,7 @@ package com.growthscore.demo
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -20,7 +21,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import android.content.res.Configuration
-import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,6 +38,20 @@ private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录�
     var updatePrompt by remember{mutableStateOf(false)}
     val context=LocalContext.current
     val view=LocalView.current
+    var lastBackAt by remember { mutableLongStateOf(0L) }
+    BackHandler {
+        if(tab!=RootTab.HOME) {
+            analysisImmersive=false
+            tab=RootTab.HOME
+        } else {
+            val now=android.os.SystemClock.elapsedRealtime()
+            if(now-lastBackAt<=2000L) (context as? android.app.Activity)?.finish()
+            else {
+                lastBackAt=now
+                android.widget.Toast.makeText(context,"再滑动一次屏幕退出程序",android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     DisposableEffect(tab,analysisImmersive){
         val activity=context as? android.app.Activity
         val controller=activity?.let { WindowCompat.getInsetsController(it.window,view) }
