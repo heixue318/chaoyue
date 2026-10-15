@@ -11,7 +11,7 @@ class LocalStore(context: Context) {
     private val prefs = context.getSharedPreferences("chaoyue_local_data", Context.MODE_PRIVATE)
 
     fun load(): AppData = prefs.getString("data", null)?.let(::decode) ?: AppData(
-        DemoRepository.student, DemoRepository.subjects, DemoRepository.exams, DemoRepository.initialGoals
+        DemoRepository.student, DemoRepository.subjects, (DemoRepository.exams + DemoRepository.subjectTests).sortedBy { it.date }, DemoRepository.initialGoals
     )
 
     fun save(data: AppData) {
@@ -35,7 +35,7 @@ class LocalStore(context: Context) {
         put("exams", JSONArray().apply { data.exams.forEach { exam -> put(JSONObject().apply {
             put("id", exam.id); put("name", exam.name); put("date", exam.date); put("kind", exam.kind.name); put("schoolYear", exam.schoolYear); put("term", exam.term); put("note", exam.note)
             put("scores", JSONArray().apply { exam.subjectScores.forEach { score -> put(JSONObject().apply {
-                put("subject", score.subject); put("score", score.score); put("full", score.fullScore); put("reasons", JSONArray(score.lossReasons))
+                put("subject", score.subject); put("score", score.score); put("full", score.fullScore); put("reasons", JSONArray(score.lossReasons)); put("losses", JSONArray().apply { score.losses.forEach { loss -> put(JSONObject().apply { put("reason",loss.reason);put("points",loss.points) }) } })
             }) } })
         }) } })
     }.toString()
@@ -49,7 +49,8 @@ class LocalStore(context: Context) {
         val goals = root.getJSONArray("goals").let { list -> List(list.length()) { i -> list.getJSONObject(i).let { SubjectGoal(it.getString("subject"), it.getDouble("target"), it.optString("term", "当前学期"), it.optBoolean("enabled", true)) } } }
         val exams = root.getJSONArray("exams").let { list -> List(list.length()) { i -> list.getJSONObject(i).let { item ->
             val scores = item.getJSONArray("scores").let { values -> List(values.length()) { j -> values.getJSONObject(j).let { score ->
-                SubjectScore(score.getString("subject"), score.getDouble("score"), score.getDouble("full"), strings(score.optJSONArray("reasons") ?: JSONArray()))
+                val reasons=strings(score.optJSONArray("reasons") ?: JSONArray()); val losses=score.optJSONArray("losses")?.let { lossArray -> List(lossArray.length()) { k -> lossArray.getJSONObject(k).let { LossRecord(it.getString("reason"),it.optDouble("points",0.0)) } } } ?: reasons.map { LossRecord(it,0.0) }
+                SubjectScore(score.getString("subject"), score.getDouble("score"), score.getDouble("full"), reasons, losses)
             } } }
             Exam(item.getString("id"), item.getString("name"), item.getString("date"), ExamKind.valueOf(item.getString("kind")), scores, item.optString("schoolYear", "未标注"), item.optString("term", "未标注"), item.optString("note", ""))
         } } }

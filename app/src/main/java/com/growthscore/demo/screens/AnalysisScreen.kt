@@ -29,8 +29,10 @@ fun AnalysisScreen(vm: DemoViewModel) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长") })
             Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("目标差距") })
+            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("阶段报告") })
+            Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("考试对比") })
         }
-        Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); else->GoalGapAnalysis(vm) } }
+        Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); 2->GoalGapAnalysis(vm); 3->PhaseReport(vm); else->ExamCompare(vm) } }
     }
 }
 
@@ -87,13 +89,36 @@ private data class GoalGapRow(val score:SubjectScore,val target:Double) {
     val values = vm.exams.mapNotNull { it.subjectScores.find { score -> score.subject == subject }?.rate }
     val latestKind=vm.exams.lastOrNull { exam -> exam.subjectScores.any { it.subject==subject } }?.kind
     val comparable=vm.exams.filter { it.kind==latestKind }.mapNotNull { exam -> exam.subjectScores.find { it.subject==subject }?.rate }.takeLast(5)
+    val lossLabels=listOf("知识点不会","审题错误","计算错误","记忆不牢","时间不足","其他")
+    val lossTotals=lossLabels.map { label -> label to vm.exams.flatMap { exam -> exam.subjectScores.find { it.subject==subject }?.losses.orEmpty() }.filter { it.reason==label }.sumOf { it.points } }; val largestLoss=lossTotals.maxOfOrNull { it.second }?:0.0; val lossRadar=lossTotals.map { it.first to if(largestLoss>0)it.second/largestLoss*100 else 0.0 }
     val stability=stabilityOf(comparable)
     Column(Modifier.padding(top = 18.dp).verticalScroll(rememberScrollState())) {
         vm.subjects.chunked(4).forEach { row -> Row { row.forEach { item -> FilterChip(selected = item == subject, onClick = { subject = item }, label = { Text(item) }, modifier = Modifier.padding(end = 8.dp)) } } }
         Card(Modifier.fillMaxWidth().padding(top = 18.dp)) { Column(Modifier.padding(20.dp)) { Text("${subject}成长曲线（纵轴：得分率 %）"); LineChart(values,labels=vm.exams.map{it.name}); Text(if(values.isEmpty()) "暂无该学科记录" else "平均得分率：${formatRate(values.average())}  最高：${formatRate(values.max())}") } }
         Card(Modifier.fillMaxWidth().padding(top=12.dp)) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) { Text("近期成绩稳定性",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("成绩水平：${if(values.isEmpty()) "暂无记录" else levelFor(values.last())}"); Text("发展趋势：${trendOf(comparable)}"); Text("稳定性：${stability.label}",color=if(stability.label=="波动较大") MaterialTheme.colorScheme.error else Green,fontWeight=FontWeight.Bold); Text(stability.detail,style=MaterialTheme.typography.bodySmall,color=Color.Gray); Text("稳定性只描述近期成绩波动，不代表学科水平高低。",style=MaterialTheme.typography.bodySmall,color=Color.Gray) } }
+        if(lossRadar.any { it.second>0 }) Card(Modifier.fillMaxWidth().padding(top=12.dp)) { Column(Modifier.padding(20.dp)) { Text("${subject}失分原因雷达图",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("按已记录的失分分值累计，仅供复盘定位常见问题。",style=MaterialTheme.typography.bodySmall,color=Color.Gray); RadarChart(lossRadar,Modifier.fillMaxWidth().aspectRatio(1f)) } }
     }
 }
 private data class Stability(val label:String,val detail:String)
 private fun stabilityOf(values:List<Double>):Stability { if(values.size<3)return Stability("数据不足","同类可比考试少于 3 次，暂不评价稳定性。"); val mean=values.average(); val sd=kotlin.math.sqrt(values.sumOf { (it-mean)*(it-mean) }/values.size); val label=when { sd<=3->"表现稳定";sd<=6->"存在一定波动";else->"波动较大" }; return Stability(label,"最近 ${values.size} 次同类考试得分率标准差 ${formatScore(sd)} 个百分点。") }
 private fun trendOf(values:List<Double>)=when { values.size<2->"数据不足"; values.last()-values.first()>2->"近期上升"; values.first()-values.last()>2->"近期回落"; else->"近期基本持平" }
+
+@Composable private fun PhaseReport(vm:DemoViewModel) {
+    var range by rememberSaveable { mutableStateOf("当前学期") }; var from by rememberSaveable { mutableStateOf("") }; var to by rememberSaveable { mutableStateOf("") }; var exportMessage by remember { mutableStateOf<String?>(null) }
+    val all=vm.exams.filter { it.kind==ExamKind.COMPREHENSIVE }; val records=all.filter { exam -> when(range) { "当前学期"->exam.term==vm.student.term; "当前学年"->exam.schoolYear==vm.student.schoolYear; "指定年级"->true; else->(from.isBlank()||exam.date>=from)&&(to.isBlank()||exam.date<=to) } }
+    val average=records.map{it.rate}.average(); val delta=if(records.size>=2)records.last().rate-records.first().rate else null
+    Column(Modifier.fillMaxSize().padding(top=14.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text("阶段成长报告",fontSize=21.sp,fontWeight=FontWeight.Bold); Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("当前学期","当前学年","指定年级","自定义").forEach { FilterChip(selected=range==it,onClick={range=it},label={Text(it)}) }}
+        if(range=="自定义") Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(from,{from=it},label={Text("开始日期")},modifier=Modifier.weight(1f));OutlinedTextField(to,{to=it},label={Text("结束日期")},modifier=Modifier.weight(1f))}
+        if(records.isEmpty()) Text("该范围暂无综合考试记录。") else { Button({exportMessage=vm.exportReportImage(range,records).getOrElse{"导出失败：${it.message}"}}){Text("导出报告图片")}; Card { Column(Modifier.padding(18.dp)) { Text("综合表现",fontWeight=FontWeight.Bold);Text("综合平均得分率 ${formatRate(average)}",fontSize=26.sp,fontWeight=FontWeight.Bold);Text(if(delta==null)"仅 1 次综合考试，显示成绩但不判断增长趋势。" else "首末两次可比综合考试变化 ${if(delta>=0)"+" else ""}${formatScore(delta)} 个百分点",color=if((delta?:0.0)>=0)Green else MaterialTheme.colorScheme.error);LineChart(records.map{it.rate},labels=records.map{it.name}) } }
+            val common=records.first().subjectScores.map{it.subject}.toSet().intersect(records.last().subjectScores.map{it.subject}.toSet()); Card { Column(Modifier.padding(18.dp)) { Text("学科变化",fontWeight=FontWeight.Bold); common.forEach { subject->val a=records.first().subjectScores.first{it.subject==subject}.rate;val b=records.last().subjectScores.first{it.subject==subject}.rate;Text("$subject：${if(b-a>=0)"+" else ""}${formatScore(b-a)} 个百分点") }; if(common.size!=records.first().subjectScores.size||common.size!=records.last().subjectScores.size)Text("学科组合不同，仅比较共同学科；综合成绩不直接比较。",style=MaterialTheme.typography.bodySmall,color=Color.Gray) } }
+            Card { Column(Modifier.padding(18.dp)) { Text("成长总结",fontWeight=FontWeight.Bold);Text("${if(delta==null)"继续积累同类综合考试记录。" else if(delta>=0)"本阶段综合得分率较起点提高。" else "本阶段综合得分率较起点回落。"} 不同试卷难度会影响分数，不直接据此判断学习能力变化。") } }
+        }
+    }
+    exportMessage?.let { message->AlertDialog(onDismissRequest={exportMessage=null},title={Text("阶段报告")},text={Text(message)},confirmButton={TextButton({exportMessage=null}){Text("知道了")}}) }
+}
+@Composable private fun ExamCompare(vm:DemoViewModel) {
+    val exams=vm.exams.filter{it.kind==ExamKind.COMPREHENSIVE}; var aIndex by rememberSaveable{mutableStateOf(0)};var bIndex by rememberSaveable{mutableStateOf((exams.size-1).coerceAtLeast(0))}; if(exams.isEmpty())return
+    val a=exams[aIndex.coerceIn(0,exams.lastIndex)];val b=exams[bIndex.coerceIn(0,exams.lastIndex)];val common=a.subjectScores.map{it.subject}.toSet().intersect(b.subjectScores.map{it.subject}.toSet()); val comparable=common.size==a.subjectScores.size&&common.size==b.subjectScores.size
+    Column(Modifier.fillMaxSize().padding(top=14.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){Text("任意两次考试对比",fontSize=21.sp,fontWeight=FontWeight.Bold);Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton({aIndex=(aIndex+1)%exams.size}){Text("考试 A：${a.name}")};OutlinedButton({bIndex=(bIndex+1)%exams.size}){Text("考试 B：${b.name}")}};Card { Column(Modifier.padding(18.dp)){Text("${a.name} ${formatRate(a.rate)}   →   ${b.name} ${formatRate(b.rate)}",fontWeight=FontWeight.Bold);if(comparable)Text("综合得分率变化 ${if(b.rate-a.rate>=0)"+" else ""}${formatScore(b.rate-a.rate)} 个百分点",color=Green) else Text("学科组合不同，仅比较共同学科，综合成绩不可直接比较。",color=MaterialTheme.colorScheme.error);common.forEach { subject->val x=a.subjectScores.first{it.subject==subject}.rate;val y=b.subjectScores.first{it.subject==subject}.rate;Text("$subject  ${formatRate(x)} → ${formatRate(y)}  ${if(y-x>=0)"+" else ""}${formatScore(y-x)} pp")};Text("不同试卷难度会影响结果，不直接判定学习能力上升或下降。",style=MaterialTheme.typography.bodySmall,color=Color.Gray)}}
+}}

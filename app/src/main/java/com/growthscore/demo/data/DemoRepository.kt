@@ -24,7 +24,11 @@ object DemoRepository {
     )
     val initialGoals = listOf(SubjectGoal("语文",85.0), SubjectGoal("数学",95.0), SubjectGoal("英语",90.0), SubjectGoal("物理",90.0), SubjectGoal("历史",90.0), SubjectGoal("地理",90.0), SubjectGoal("生物",90.0), SubjectGoal("道德与法治",90.0))
 
-    private fun exam(name: String, date: String, rates: List<Int>) = Exam(name, name, date, ExamKind.COMPREHENSIVE,
-        subjects.zip(rates).map { (subject, rate) -> SubjectScore(subject, rate.toDouble(), 100.0, if (subject == "英语") listOf("词汇", "审题错误") else listOf("计算错误")) })
-    private fun test(name: String, date: String, subject: String, score: Int, full: Int) = Exam(name, name, date, ExamKind.SUBJECT_TEST, listOf(SubjectScore(subject, score.toDouble(), full.toDouble())))
+    private fun exam(name: String, date: String, rates: List<Int>): Exam {
+        val scores=subjects.zip(rates).map { (subject, rate) ->
+            SubjectScore(subject,rate.toDouble(),100.0,emptyList(),if(subject=="英语") listOf(LossRecord("记忆不牢",4.0),LossRecord("审题错误",2.0)) else listOf(LossRecord("计算错误",2.0)))
+        }
+        return Exam(name,name,date,ExamKind.COMPREHENSIVE,scores,"2026-2027学年",if(date<"2027-02-01")"上学期" else "下学期")
+    }
+    private fun test(name: String, date: String, subject: String, score: Int, full: Int) = Exam(name, name, date, ExamKind.SUBJECT_TEST, listOf(SubjectScore(subject, score.toDouble(), full.toDouble())), "2026-2027学年", if(date<"2027-02-01")"上学期" else "下学期")
 }
