@@ -38,7 +38,8 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     val exams get() = data.exams
     val goals get() = data.goals
     val fullScores get() = data.fullScores
-    val studyPlan get() = data.plan
+    val studyPlans get() = data.plans
+    val activeStudyPlans get() = data.plans.filter { it.status==StudyPlanStatus.ACTIVE }
     val latest get() = exams.last()
     val currentVersion = BuildConfig.VERSION_NAME
     var updateStatus by mutableStateOf<UpdateStatus>(UpdateStatus.Idle); private set
@@ -48,16 +49,15 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     fun saveExam(exam: Exam) { persist(data.copy(exams = (data.exams + exam).takeLast(300))) }
     fun createStudyPlan(name:String,type:StudyPlanType,start:String,end:String,availability:Map<Int,Int>,subjects:List<String>):Result<StudyPlan> = runCatching {
         val plan=PlanEngine.generate(name,type,LocalDate.parse(start),LocalDate.parse(end),availability,subjects,data.exams,data.goals)
-        persist(data.copy(plan=plan)); plan
+        persist(data.copy(plans=data.plans + plan)); plan
     }
     fun togglePlanTask(taskId:String) {
-        val plan=data.plan?:return
-        val tasks=plan.tasks.map { task -> if(task.id!=taskId) task else if(task.status==PlanTaskStatus.COMPLETED) task.copy(status=PlanTaskStatus.PENDING,completedAt=null) else task.copy(status=PlanTaskStatus.COMPLETED,completedAt=System.currentTimeMillis()) }
-        persist(data.copy(plan=plan.copy(tasks=tasks)))
+        val plans=data.plans.map { plan -> plan.copy(tasks=plan.tasks.map { task -> if(task.id!=taskId) task else if(task.status==PlanTaskStatus.COMPLETED) task.copy(status=PlanTaskStatus.PENDING,completedAt=null) else task.copy(status=PlanTaskStatus.COMPLETED,completedAt=System.currentTimeMillis()) }) }
+        persist(data.copy(plans=plans))
     }
-    fun pausePlan() { data.plan?.let { persist(data.copy(plan=it.copy(status=if(it.status==StudyPlanStatus.PAUSED)StudyPlanStatus.ACTIVE else StudyPlanStatus.PAUSED))) } }
-    fun endPlan() { data.plan?.let { persist(data.copy(plan=it.copy(status=StudyPlanStatus.ENDED))) } }
-    fun todayPlanTasks(date:String=LocalDate.now().toString())=data.plan?.takeIf { it.status==StudyPlanStatus.ACTIVE }?.tasks?.filter { it.plannedDate==date }.orEmpty()
+    fun pausePlan(planId:String) { persist(data.copy(plans=data.plans.map { plan -> if(plan.id==planId) plan.copy(status=if(plan.status==StudyPlanStatus.PAUSED)StudyPlanStatus.ACTIVE else StudyPlanStatus.PAUSED) else plan })) }
+    fun endPlan(planId:String) { persist(data.copy(plans=data.plans.map { plan -> if(plan.id==planId) plan.copy(status=StudyPlanStatus.ENDED) else plan })) }
+    fun todayPlanTasks(date:String=LocalDate.now().toString())=activeStudyPlans.flatMap { it.tasks }.filter { it.plannedDate==date }
     fun deleteExam(id: String) { if (data.exams.size > 1) persist(data.copy(exams = data.exams.filterNot { it.id == id })) }
     fun deleteExams(ids: Set<String>) { val remaining=data.exams.filterNot { it.id in ids }; if(remaining.isNotEmpty()) persist(data.copy(exams = remaining)) }
     fun exportBackup(): Result<String> = runCatching {

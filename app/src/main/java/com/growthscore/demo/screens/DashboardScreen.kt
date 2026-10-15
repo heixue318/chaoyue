@@ -23,13 +23,16 @@ import com.growthscore.demo.ui.*
 @Composable fun DashboardScreen(vm:DemoViewModel){val compact=LocalCompactLayout.current;val gap=if(compact)8.dp else 14.dp;val pad=if(compact)8.dp else 16.dp;val latest=vm.latest;val previous=vm.exams.getOrNull(vm.exams.lastIndex-1);val delta=latest.rate-(previous?.rate?:latest.rate);val change="%+.1f%%".format(delta);Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(gap)){Text(vm.student.name,fontSize=if(compact)22.sp else 28.sp,fontWeight=FontWeight.Bold);Text("${vm.student.grade}${vm.student.term} · ${vm.student.schoolYear}",color=Color.Gray);TodayPlanCard(vm,compact);Card(colors=CardDefaults.cardColors(containerColor=PaleBlue),modifier=Modifier.fillMaxWidth()){Column(Modifier.padding(if(compact)12.dp else 18.dp)){Text("最近一次综合考试",color=Color.Gray);Text(latest.name,fontSize=if(compact)18.sp else 22.sp,fontWeight=FontWeight.Bold);Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("综合得分率",color=Color.Gray);Text("%.1f%%".format(latest.rate),fontSize=if(compact)36.sp else 48.sp,fontWeight=FontWeight.Bold);Text("★★★★★  ${levelFor(latest.rate)}",color=Green,fontWeight=FontWeight.Bold)};Text("↑ $change",color=Green,fontWeight=FontWeight.Bold)}}};Card(Modifier.fillMaxWidth()){Column(Modifier.padding(if(compact)12.dp else 16.dp)){Text("我的综合成长曲线",fontSize=19.sp,fontWeight=FontWeight.Bold);LineChart(vm.exams.map{it.rate},Modifier.padding(top=4.dp),chartHeight=if(compact)118.dp else 180.dp);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){vm.exams.takeLast(4).forEach{Text(it.name,fontSize=11.sp,color=Color.Gray)}}}};BoxWithConstraints(Modifier.fillMaxWidth()){if(maxWidth>=700.dp)Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){SubjectCards(vm,Modifier.weight(1f),Modifier.weight(1f))}else Column(verticalArrangement=Arrangement.spacedBy(12.dp)){SubjectCards(vm,Modifier.fillMaxWidth(),Modifier.fillMaxWidth())}}}}
 
 @Composable private fun TodayPlanCard(vm:DemoViewModel,compact:Boolean) {
-    val plan=vm.studyPlan ?: return
-    if(plan.status!=StudyPlanStatus.ACTIVE) return
+    val plans=vm.activeStudyPlans
+    if(plans.isEmpty()) return
     val tasks=vm.todayPlanTasks(); val done=tasks.count { it.status==PlanTaskStatus.COMPLETED }
     Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(if(compact)12.dp else 16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
         Text("今日学习计划",fontSize=19.sp,fontWeight=FontWeight.Bold)
-        Text("${plan.name} · 已完成 $done / ${tasks.size} 项",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
-        if(tasks.isEmpty()) Text("今天安排休息或暂无任务。",color=Color.Gray) else tasks.forEach { task -> PlanTaskLine(task) { vm.togglePlanTask(task.id) } }
+        Text("${plans.size} 个执行中计划 · 已完成 $done / ${tasks.size} 项",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
+        if(tasks.isEmpty()) Text("今天安排休息或暂无任务。",color=Color.Gray) else plans.forEach { plan ->
+            val planTasks=plan.tasks.filter { it.plannedDate==java.time.LocalDate.now().toString() }
+            if(planTasks.isNotEmpty()) { Text(plan.name,fontWeight=FontWeight.Medium,color=Blue); planTasks.forEach { task -> PlanTaskLine(task) { vm.togglePlanTask(task.id) } } }
+        }
     } }
 }
 @Composable private fun RowScope.SubjectCards(vm:DemoViewModel,a:Modifier,b:Modifier){SubjectCardsBody(vm,a,b)}

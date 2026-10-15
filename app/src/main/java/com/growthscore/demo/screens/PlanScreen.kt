@@ -18,11 +18,35 @@ import java.time.LocalDate
 
 @Composable
 fun PlanScreen(vm:DemoViewModel) {
-    val plan=vm.studyPlan
-    if(plan!=null && plan.status!=StudyPlanStatus.ENDED) ActivePlan(vm,plan) else PlanCreator(vm)
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    when {
+        creating -> PlanCreator(vm,onCreated={creating=false},onCancel={creating=false})
+        selectedId!=null -> vm.studyPlans.firstOrNull { it.id==selectedId }?.let { PlanDetail(vm,it,onBack={selectedId=null}) } ?: PlanHistory(vm,{creating=true},{selectedId=it})
+        else -> PlanHistory(vm,{creating=true},{selectedId=it})
+    }
 }
 
-@Composable private fun PlanCreator(vm:DemoViewModel) {
+@Composable private fun PlanHistory(vm:DemoViewModel,onCreate:()->Unit,onSelect:(String)->Unit) {
+    val plans=vm.studyPlans.sortedByDescending { it.createdAt }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text("学习计划",fontSize=21.sp,fontWeight=FontWeight.Bold); Button(onCreate){Text("新建计划")} }
+        Text("可同时执行学期计划和假日／自定义计划；首页会合并显示当天的任务。",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
+        if(plans.isEmpty()) Card { Column(Modifier.padding(18.dp)) { Text("还没有学习计划",fontWeight=FontWeight.Bold); Text("点击右上角“新建计划”，从可用时间和学科开始安排。",color=Color.Gray) } }
+        plans.forEach { plan ->
+            val status=when(plan.status){StudyPlanStatus.ACTIVE->"执行中";StudyPlanStatus.PAUSED->"已暂停";StudyPlanStatus.ENDED->"已结束"}
+            val done=plan.tasks.count { it.status==PlanTaskStatus.COMPLETED }
+            Card(colors=CardDefaults.cardColors(containerColor=if(plan.status==StudyPlanStatus.ACTIVE) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(plan.name,fontWeight=FontWeight.Bold,fontSize=18.sp); Text(status,color=if(plan.status==StudyPlanStatus.ACTIVE) MaterialTheme.colorScheme.primary else Color.Gray) }
+                Text("${plan.startDate} 至 ${plan.endDate} · ${planTypeLabel(plan.type)}")
+                Text("已完成 $done / ${plan.tasks.size} 项",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
+                Row { TextButton({onSelect(plan.id)}){Text("查看任务")}; if(plan.status!=StudyPlanStatus.ENDED) { TextButton({vm.pausePlan(plan.id)}){Text(if(plan.status==StudyPlanStatus.PAUSED)"恢复" else "暂停")}; TextButton({vm.endPlan(plan.id)}){Text("结束")} } }
+            } }
+        }
+    }
+}
+
+@Composable private fun PlanCreator(vm:DemoViewModel,onCreated:()->Unit,onCancel:()->Unit) {
     var typeName by rememberSaveable { mutableStateOf("学期") }
     var name by rememberSaveable { mutableStateOf("我的学习计划") }
     var start by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
@@ -33,8 +57,8 @@ fun PlanScreen(vm:DemoViewModel) {
     var message by remember { mutableStateOf<String?>(null) }
     val type=when(typeName){"寒假"->StudyPlanType.WINTER_BREAK;"暑假"->StudyPlanType.SUMMER_BREAK;"自定义"->StudyPlanType.CUSTOM;else->StudyPlanType.TERM}
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("学习计划",fontSize=21.sp,fontWeight=FontWeight.Bold)
-        Text("根据现有成绩给出可修改的学习安排；任务仅使用本地数据，不会覆盖历史成绩。",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text("新建学习计划",fontSize=21.sp,fontWeight=FontWeight.Bold); TextButton(onCancel){Text("取消")} }
+        Text("新计划不会替换已有计划。假日或自定义计划可以与学期计划叠加执行。",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
         Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("1. 计划类型与日期",fontWeight=FontWeight.Bold)
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("学期","寒假","暑假","自定义").forEach{FilterChip(typeName==it,{typeName=it},label={Text(it)})}}
@@ -54,27 +78,29 @@ fun PlanScreen(vm:DemoViewModel) {
         } }
         Button(onClick={
             val week=(weekday.toIntOrNull()?:0).coerceIn(0,600); val rest=(weekend.toIntOrNull()?:0).coerceIn(0,600)
-            vm.createStudyPlan(name,type,start,end,mapOf(1 to week,2 to week,3 to week,4 to week,5 to week,6 to rest,7 to rest),enabled.toList()).onFailure { message=it.message ?: "生成计划失败" }
+            vm.createStudyPlan(name,type,start,end,mapOf(1 to week,2 to week,3 to week,4 to week,5 to week,6 to rest,7 to rest),enabled.toList()).onSuccess { onCreated() }.onFailure { message=it.message ?: "生成计划失败" }
         },modifier=Modifier.fillMaxWidth(),enabled=enabled.isNotEmpty()){Text("生成并启用学习计划")}
         message?.let{Text(it,color=MaterialTheme.colorScheme.error)}
     }
 }
 
-@Composable private fun ActivePlan(vm:DemoViewModel,plan:StudyPlan) {
-    val today=LocalDate.now().toString(); val todayTasks=vm.todayPlanTasks(today); val done=todayTasks.count{it.status==PlanTaskStatus.COMPLETED}
+@Composable private fun PlanDetail(vm:DemoViewModel,plan:StudyPlan,onBack:()->Unit) {
+    val today=LocalDate.now().toString(); val todayTasks=plan.tasks.filter { it.plannedDate==today }; val done=todayTasks.count{it.status==PlanTaskStatus.COMPLETED}
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("学习计划",fontSize=21.sp,fontWeight=FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(plan.name,fontSize=21.sp,fontWeight=FontWeight.Bold); TextButton(onBack){Text("返回列表")} }
         Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            Text(plan.name,fontSize=20.sp,fontWeight=FontWeight.Bold);Text("${plan.startDate} 至 ${plan.endDate} · ${if(plan.status==StudyPlanStatus.PAUSED)"已暂停" else "执行中"}")
+            Text("${plan.startDate} 至 ${plan.endDate} · ${planTypeLabel(plan.type)}")
             Text("今日完成 $done / ${todayTasks.size} 项",fontSize=18.sp,fontWeight=FontWeight.Medium)
             LinearProgressIndicator(progress={if(todayTasks.isEmpty())0f else done.toFloat()/todayTasks.size},modifier=Modifier.fillMaxWidth())
-            Row{TextButton({vm.pausePlan()}){Text(if(plan.status==StudyPlanStatus.PAUSED)"恢复计划" else "暂停计划")};TextButton({vm.endPlan()}){Text("结束计划")}}
+            if(plan.status!=StudyPlanStatus.ENDED) Row{TextButton({vm.pausePlan(plan.id)}){Text(if(plan.status==StudyPlanStatus.PAUSED)"恢复计划" else "暂停计划")};TextButton({vm.endPlan(plan.id)}){Text("结束计划")}}
         } }
         Text("每周学科安排",fontWeight=FontWeight.Bold); plan.weeklyMinutes.filterValues { it>0 }.forEach { (subject,minutes)->Text("$subject：$minutes 分钟") }
         Text("未来 14 天任务",fontWeight=FontWeight.Bold)
         plan.tasks.take(14).forEach { task->PlanTaskLine(task,enabled=plan.status==StudyPlanStatus.ACTIVE){vm.togglePlanTask(task.id)} }
     }
 }
+
+private fun planTypeLabel(type:StudyPlanType)=when(type){StudyPlanType.TERM->"学期计划";StudyPlanType.WINTER_BREAK->"寒假计划";StudyPlanType.SUMMER_BREAK->"暑假计划";StudyPlanType.CUSTOM->"自定义计划"}
 
 @Composable fun PlanTaskLine(task:PlanTask,enabled:Boolean=true,onToggle:()->Unit) = Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
     Checkbox(task.status==PlanTaskStatus.COMPLETED,onCheckedChange={onToggle()},enabled=enabled)
