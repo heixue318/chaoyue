@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.growthscore.demo.ui.Blue
+import com.growthscore.demo.model.formatScore
 import kotlin.math.*
 
 @Composable fun LineChart(values: List<Double>, modifier: Modifier = Modifier, color: Color = Blue, labels: List<String> = emptyList(), onPointClick: ((Int) -> Unit)? = null, chartHeight: Dp = 180.dp) {
@@ -41,6 +42,6 @@ import kotlin.math.*
         val data=Path().apply { moveTo(point(0,(values[0].second/100).toFloat()).x,point(0,(values[0].second/100).toFloat()).y); for(index in 1 until count) lineTo(point(index,(values[index].second/100).toFloat()).x,point(index,(values[index].second/100).toFloat()).y); close() }
         drawPath(data,Blue.copy(alpha=.25f)); drawPath(data,Blue,style=Stroke(3f))
         val paint=android.graphics.Paint().apply { this.color=android.graphics.Color.DKGRAY; textSize=(size.minDimension*.055f).coerceAtMost(28f); textAlign=android.graphics.Paint.Align.CENTER }
-        values.forEachIndexed { index,pair -> val anchor=point(index,1.22f); drawContext.canvas.nativeCanvas.drawText(pair.first,anchor.x,anchor.y-8f,paint); drawContext.canvas.nativeCanvas.drawText(pair.second.toInt().toString(),anchor.x,anchor.y+20f,paint) }
+        values.forEachIndexed { index,pair -> val anchor=point(index,1.22f); drawContext.canvas.nativeCanvas.drawText(pair.first,anchor.x,anchor.y-8f,paint); drawContext.canvas.nativeCanvas.drawText(formatScore(pair.second),anchor.x,anchor.y+20f,paint) }
     }
 }

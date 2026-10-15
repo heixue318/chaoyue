@@ -1,6 +1,9 @@
 package com.growthscore.demo.screens
 
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +23,8 @@ import com.growthscore.demo.ui.UpdateStatus
     val compact=LocalCompactLayout.current
     var help by remember { mutableStateOf(false) }; var studentEdit by remember { mutableStateOf(false) }
     var subjectEdit by remember { mutableStateOf(false) }; var update by remember { mutableStateOf(false) }
+    var backupMessage by remember { mutableStateOf<String?>(null) }; var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    val importBackup=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> restoreUri=uri }
     Column(Modifier.fillMaxSize().padding(if(compact)8.dp else 16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(if(compact)8.dp else 14.dp)) {
         Text("我的",fontSize=if(compact)22.sp else 28.sp,fontWeight=FontWeight.Bold)
         BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -27,11 +32,14 @@ import com.growthscore.demo.ui.UpdateStatus
             else Column(verticalArrangement=Arrangement.spacedBy(12.dp)) { InfoCards(vm,{studentEdit=true},{subjectEdit=true}) }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) { OutlinedButton({help=true}){Text("帮助中心")}; OutlinedButton({update=true}){Text("检查更新")} }
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("数据备份与恢复",fontSize=19.sp,fontWeight=FontWeight.Bold);Text("导出完整成绩、当次满分、学科设置和目标到设备“下载”文件夹。恢复前会校验备份文件。",style=MaterialTheme.typography.bodySmall);Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){TextButton({backupMessage=vm.exportBackup().getOrElse { "导出失败：${it.message}" }}){Text("导出 CSV")};TextButton({importBackup.launch(arrayOf("text/*","text/csv"))}){Text("导入备份")}} } }
     }
     if(studentEdit) StudentDialog(vm){studentEdit=false}
     if(subjectEdit) SubjectsDialog(vm){subjectEdit=false}
     if(help) HelpDialog{help=false}
     if(update) UpdateDialog(vm){update=false}
+    backupMessage?.let { message -> AlertDialog(onDismissRequest={backupMessage=null},title={Text("数据备份")},text={Text(message)},confirmButton={TextButton({backupMessage=null}){Text("知道了")}}) }
+    restoreUri?.let { uri -> AlertDialog(onDismissRequest={restoreUri=null},title={Text("恢复完整备份？")},text={Text("恢复会覆盖当前本机数据。文件会先校验，校验失败不会修改现有数据。")},confirmButton={TextButton({backupMessage=vm.restoreBackup(uri).getOrElse { "恢复失败：${it.message}" };restoreUri=null}){Text("确认恢复")}},dismissButton={TextButton({restoreUri=null}){Text("取消")}}) }
 }
 
 @Composable private fun RowScope.InfoCards(vm:DemoViewModel,editStudent:()->Unit,editSubjects:()->Unit) = InfoCardsBody(vm,editStudent,editSubjects,Modifier.weight(1f),Modifier.weight(1f),Modifier.weight(1f))
@@ -53,9 +61,13 @@ import com.growthscore.demo.ui.UpdateStatus
     var selected by remember{mutableStateOf(vm.subjects.toSet())}; var custom by remember{mutableStateOf("")}
     val full=remember{mutableStateMapOf<String,String>().also { map -> vm.subjects.forEach { subject -> map[subject]=vm.fullScore(subject).toInt().toString() } }}
     val goals=remember{mutableStateMapOf<String,String>().also { map -> vm.subjects.forEach { subject -> map[subject]=(vm.goals.find { it.subject==subject }?.target?:90.0).toInt().toString() } }}
+    var goalTerm by remember { mutableStateOf(vm.goals.firstOrNull()?.term ?: vm.student.term) }
+    var goalsEnabled by remember { mutableStateOf(vm.goals.firstOrNull()?.enabled ?: true) }
     fun configuredSubjects()=(selected+custom.split("，",","," ")).map(String::trim).filter(String::isNotBlank).distinct()
     AlertDialog(onDismissRequest=dismiss,title={Text("学科、满分与学习目标")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)) {
         Text("为每科设置满分和目标得分率；目标用于分析中心的差距计算。",style=MaterialTheme.typography.bodySmall)
+        OutlinedTextField(goalTerm,{goalTerm=it},label={Text("目标适用学期")},placeholder={Text("如 上学期")},singleLine=true,modifier=Modifier.fillMaxWidth())
+        Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Checkbox(goalsEnabled,{goalsEnabled=it});Text("启用学习目标")}
         defaults.chunked(3).forEach { row -> Row { row.forEach { subject -> FilterChip(selected=subject in selected,onClick={selected=if(subject in selected)selected-subject else selected+subject; if(subject !in full)full[subject]="100";if(subject !in goals)goals[subject]="90"},label={Text(subject)},modifier=Modifier.padding(end=5.dp)) } } }
         EditField("自定义学科",custom){custom=it}
         configuredSubjects().forEach { subject ->
@@ -63,7 +75,7 @@ import com.growthscore.demo.ui.UpdateStatus
             OutlinedTextField(value=full[subject] ?: "100",onValueChange={full[subject]=it},label={Text("${subject} 满分")},suffix={Text("分")},singleLine=true,modifier=Modifier.fillMaxWidth())
             OutlinedTextField(value=goals[subject] ?: "90",onValueChange={goals[subject]=it},label={Text("${subject} 学习目标")},suffix={Text("%")},singleLine=true,modifier=Modifier.fillMaxWidth())
         }
-    }},confirmButton={TextButton({val subjects=configuredSubjects();vm.updateSubjects(subjects);vm.updateFullScores(subjects.associateWith { full[it]?.toDoubleOrNull()?:100.0 });vm.updateGoals(subjects.associateWith { goals[it]?.toDoubleOrNull()?:90.0 });dismiss()}){Text("保存")}},dismissButton={TextButton(dismiss){Text("取消")}})
+    }},confirmButton={TextButton({val subjects=configuredSubjects();vm.updateSubjects(subjects);vm.updateFullScores(subjects.associateWith { full[it]?.toDoubleOrNull()?:100.0 });vm.updateGoals(subjects.associateWith { goals[it]?.toDoubleOrNull()?:90.0 },goalTerm.ifBlank { "当前学期" },goalsEnabled);dismiss()}){Text("保存")}},dismissButton={TextButton(dismiss){Text("取消")}})
 }
 
 @Composable private fun HelpDialog(dismiss:()->Unit)=AlertDialog(onDismissRequest=dismiss,title={Text("帮助中心")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){Text("产品初心",fontWeight=FontWeight.Bold);Text("超越希望把一次次成绩变成可理解的成长轨迹：看见优势，也看见下一步可以努力的方向。所有记录默认留在你的设备上。");Text("使用方法",fontWeight=FontWeight.Bold);Text("1. 在“我的”填写学生信息、设置学科满分和学习目标。\n2. 在“成绩录入”选择考试类型并保存。\n3. 在分析中心的“目标差距”查看每科距离目标还差多少分。\n4. 可随时修改目标或学科；后续新增记录会采用最新设置。")}},confirmButton={TextButton(dismiss){Text("知道了")}})

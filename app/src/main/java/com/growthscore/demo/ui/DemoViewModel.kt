@@ -17,6 +17,8 @@ import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.content.ContentValues
+import android.provider.MediaStore
 import kotlinx.coroutines.delay
 
 class DemoViewModel(application: Application) : AndroidViewModel(application) {
@@ -35,8 +37,16 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     private fun persist(next: AppData) { data = next; store.save(next) }
     fun saveExam(exam: Exam) { persist(data.copy(exams = (data.exams + exam).takeLast(300))) }
     fun deleteExam(id: String) { if (data.exams.size > 1) persist(data.copy(exams = data.exams.filterNot { it.id == id })) }
-    fun updateGoals(values: Map<String, Double>) {
-        persist(data.copy(goals = data.subjects.map { subject -> SubjectGoal(subject, (values[subject] ?: 90.0).coerceIn(0.0, 100.0)) }))
+    fun deleteExams(ids: Set<String>) { val remaining=data.exams.filterNot { it.id in ids }; if(remaining.isNotEmpty()) persist(data.copy(exams = remaining)) }
+    fun exportBackup(): Result<String> = runCatching {
+        val context=getApplication<Application>(); val values=ContentValues().apply { put(MediaStore.Downloads.DISPLAY_NAME,"chaoyue-backup-${System.currentTimeMillis()}.csv"); put(MediaStore.Downloads.MIME_TYPE,"text/csv"); put(MediaStore.Downloads.IS_PENDING,1) }
+        val uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values) ?: error("无法创建下载文件")
+        context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(store.exportCsv(data)) } ?: error("无法写入下载文件")
+        values.clear(); values.put(MediaStore.Downloads.IS_PENDING,0); context.contentResolver.update(uri,values,null,null); "已导出到设备的“下载”文件夹"
+    }
+    fun restoreBackup(uri: Uri): Result<String> = runCatching { val raw=getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("无法读取文件"); val restored=store.importCsv(raw); persist(restored); "已恢复 ${restored.exams.size} 场考试记录" }
+    fun updateGoals(values: Map<String, Double>, term: String = "当前学期", enabled: Boolean = true) {
+        persist(data.copy(goals = data.subjects.map { subject -> SubjectGoal(subject, (values[subject] ?: 90.0).coerceIn(0.0, 100.0), term, enabled) }))
     }
     fun updateStudent(name: String, grade: String, term: String, year: String) { persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" }))) }
     fun updateSubjects(items: List<String>) {
