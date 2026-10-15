@@ -38,6 +38,20 @@ class LocalStore(context: Context) {
                 put("subject", score.subject); put("score", score.score); put("full", score.fullScore); put("reasons", JSONArray(score.lossReasons)); put("losses", JSONArray().apply { score.losses.forEach { loss -> put(JSONObject().apply { put("reason",loss.reason);put("points",loss.points) }) } })
             }) } })
         }) } })
+        data.plan?.let { plan -> put("plan", JSONObject().apply {
+            put("id", plan.id); put("name", plan.name); put("type", plan.type.name)
+            put("start", plan.startDate); put("end", plan.endDate); put("status", plan.status.name); put("createdAt", plan.createdAt)
+            put("availability", JSONObject().apply { plan.weeklyAvailability.forEach { (day, minutes) -> put(day.toString(), minutes) } })
+            put("weeklyMinutes", JSONObject().apply { plan.weeklyMinutes.forEach { (subject, minutes) -> put(subject, minutes) } })
+            put("focus", JSONArray(plan.focusSubjects.toList()))
+            put("tasks", JSONArray().apply {
+                plan.tasks.forEach { task -> put(JSONObject().apply {
+                    put("id", task.id); put("subject", task.subject); put("title", task.title); put("description", task.description)
+                    put("date", task.plannedDate); put("minutes", task.minutes); put("status", task.status.name)
+                    put("completedAt", task.completedAt ?: JSONObject.NULL)
+                }) }
+            })
+        }) }
     }.toString()
 
     private fun decode(raw: String): AppData = JSONObject(raw).let { root ->
@@ -54,8 +68,15 @@ class LocalStore(context: Context) {
             } } }
             Exam(item.getString("id"), item.getString("name"), item.getString("date"), ExamKind.valueOf(item.getString("kind")), scores, item.optString("schoolYear", "未标注"), item.optString("term", "未标注"), item.optString("note", ""))
         } } }
-        AppData(student, subjects, exams, goals, fullScores)
+        val plan=root.optJSONObject("plan")?.let { item ->
+            fun intMap(key:String)=item.optJSONObject(key)?.let { map -> map.keys().asSequence().associate { it.toInt() to map.optInt(it,0) } } ?: emptyMap()
+            fun subjectMinutes()=item.optJSONObject("weeklyMinutes")?.let { map -> map.keys().asSequence().associateWith { map.optInt(it,0) } } ?: emptyMap()
+            val focus=strings(item.optJSONArray("focus")?:JSONArray()).toSet()
+            val tasks=item.optJSONArray("tasks")?.let { values -> List(values.length()) { i -> values.getJSONObject(i).let { task -> PlanTask(task.getString("id"),task.getString("subject"),task.getString("title"),task.optString("description"),task.getString("date"),task.optInt("minutes",15),runCatching { PlanTaskStatus.valueOf(task.optString("status","PENDING")) }.getOrDefault(PlanTaskStatus.PENDING),if(task.isNull("completedAt"))null else task.optLong("completedAt")) } } } ?: emptyList()
+            StudyPlan(item.getString("id"),item.getString("name"),runCatching { StudyPlanType.valueOf(item.optString("type","CUSTOM")) }.getOrDefault(StudyPlanType.CUSTOM),item.getString("start"),item.getString("end"),runCatching { StudyPlanStatus.valueOf(item.optString("status","ACTIVE")) }.getOrDefault(StudyPlanStatus.ACTIVE),intMap("availability"),subjectMinutes(),focus,tasks,item.optLong("createdAt",System.currentTimeMillis()))
+        }
+        AppData(student, subjects, exams, goals, fullScores, plan)
     }
 }
 
-data class AppData(val student: Student, val subjects: List<String>, val exams: List<Exam>, val goals: List<SubjectGoal>, val fullScores: Map<String, Double> = emptyMap())
+data class AppData(val student: Student, val subjects: List<String>, val exams: List<Exam>, val goals: List<SubjectGoal>, val fullScores: Map<String, Double> = emptyMap(), val plan:StudyPlan?=null)

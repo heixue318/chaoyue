@@ -39,9 +39,10 @@ fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Bo
                     Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("目标差距") })
                     Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("阶段报告") })
                     Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("考试对比") })
+                    Tab(selected = tab == 5, onClick = { tab = 5 }, text = { Text("学习计划") })
                 }
             }
-            Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); 2->GoalGapAnalysis(vm); 3->PhaseReport(vm); else->ExamCompare(vm) } }
+            Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); 2->GoalGapAnalysis(vm); 3->PhaseReport(vm); 4->ExamCompare(vm); else->PlanScreen(vm) } }
         }
         if(immersive) IconButton(onClick={onImmersiveChange(false)},modifier=Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp)) { Icon(Icons.Default.FullscreenExit,"退出全屏") }
     }
