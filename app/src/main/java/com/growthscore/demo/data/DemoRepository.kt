@@ -22,7 +22,7 @@ object DemoRepository {
         test("英语语法", "2027-01-09", "英语", 43, 50), test("数学周测4", "2027-02-13", "数学", 49, 50),
         test("英语阅读2", "2027-03-06", "英语", 41, 50), test("数学周测5", "2027-04-05", "数学", 49, 50)
     )
-    val initialGoals = listOf(SubjectGoal("数学",95.0), SubjectGoal("英语",90.0), SubjectGoal("物理",94.0))
+    val initialGoals = listOf(SubjectGoal("语文",85.0), SubjectGoal("数学",95.0), SubjectGoal("英语",90.0), SubjectGoal("物理",90.0), SubjectGoal("历史",90.0), SubjectGoal("地理",90.0), SubjectGoal("生物",90.0), SubjectGoal("道德与法治",90.0))
 
     private fun exam(name: String, date: String, rates: List<Int>) = Exam(name, name, date, ExamKind.COMPREHENSIVE,
         subjects.zip(rates).map { (subject, rate) -> SubjectScore(subject, rate.toDouble(), 100.0, if (subject == "英语") listOf("词汇", "审题错误") else listOf("计算错误")) })

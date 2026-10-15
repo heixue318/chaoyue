@@ -35,11 +35,13 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     private fun persist(next: AppData) { data = next; store.save(next) }
     fun saveExam(exam: Exam) { persist(data.copy(exams = (data.exams + exam).takeLast(300))) }
     fun deleteExam(id: String) { if (data.exams.size > 1) persist(data.copy(exams = data.exams.filterNot { it.id == id })) }
-    fun updateGoal(subject: String, target: Double) { persist(data.copy(goals = data.goals.map { if (it.subject == subject) it.copy(target = target) else it })) }
+    fun updateGoals(values: Map<String, Double>) {
+        persist(data.copy(goals = data.subjects.map { subject -> SubjectGoal(subject, (values[subject] ?: 90.0).coerceIn(0.0, 100.0)) }))
+    }
     fun updateStudent(name: String, grade: String, term: String, year: String) { persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" }))) }
     fun updateSubjects(items: List<String>) {
         val clean = items.map(String::trim).filter(String::isNotBlank).distinct()
-        if (clean.isNotEmpty()) persist(data.copy(subjects = clean, goals = data.goals.filter { it.subject in clean }, fullScores=clean.associateWith { data.fullScores[it] ?: 100.0 }))
+        if (clean.isNotEmpty()) persist(data.copy(subjects = clean, goals = clean.map { subject -> SubjectGoal(subject, data.goals.find { it.subject == subject }?.target ?: 90.0) }, fullScores=clean.associateWith { data.fullScores[it] ?: 100.0 }))
     }
     fun fullScore(subject:String)=data.fullScores[subject]?:100.0
     fun updateFullScores(values:Map<String,Double>) { persist(data.copy(fullScores=data.fullScores + values.filterValues { it > 0 })) }
