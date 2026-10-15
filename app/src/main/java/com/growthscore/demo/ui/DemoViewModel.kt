@@ -29,6 +29,7 @@ import com.growthscore.demo.model.formatRate
 import com.growthscore.demo.plan.PlanEngine
 import kotlinx.coroutines.delay
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 class DemoViewModel(application: Application) : AndroidViewModel(application) {
     private val store = LocalStore(application)
@@ -48,8 +49,15 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     private fun persist(next: AppData) { data = next; store.save(next) }
     fun saveExam(exam: Exam) { persist(data.copy(exams = (data.exams + exam).takeLast(300))) }
     fun createStudyPlan(name:String,type:StudyPlanType,start:String,end:String,availability:Map<Int,Int>,subjects:List<String>):Result<StudyPlan> = runCatching {
-        val plan=PlanEngine.generate(name,type,LocalDate.parse(start),LocalDate.parse(end),availability,subjects,data.exams,data.goals)
+        val plan=PlanEngine.generate(name,type,parsePlanDate(start,"开始日期"),parsePlanDate(end,"结束日期"),availability,subjects,data.exams,data.goals)
         persist(data.copy(plans=data.plans + plan)); plan
+    }
+
+    private fun parsePlanDate(raw:String,label:String):LocalDate {
+        val normalized=raw.trim().replace('／','/').replace('/','-').replace('年','-').replace('月','-').replace("日","")
+        return runCatching { LocalDate.parse(normalized,DateTimeFormatter.ofPattern("uuuu-M-d")) }.getOrElse {
+            throw IllegalArgumentException("$label 格式不正确，请填写如 2026-09-01")
+        }
     }
     fun togglePlanTask(taskId:String) {
         val plans=data.plans.map { plan -> plan.copy(tasks=plan.tasks.map { task -> if(task.id!=taskId) task else if(task.status==PlanTaskStatus.COMPLETED) task.copy(status=PlanTaskStatus.PENDING,completedAt=null) else task.copy(status=PlanTaskStatus.COMPLETED,completedAt=System.currentTimeMillis()) }) }
