@@ -1,12 +1,15 @@
 package com.growthscore.demo.screens
 
 import android.app.DatePickerDialog
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,12 +39,16 @@ import java.time.LocalDate
 }
 private fun pickDate(context:android.content.Context,initial:String,onPick:(String)->Unit){val date=runCatching{LocalDate.parse(initial)}.getOrDefault(LocalDate.now());DatePickerDialog(context,{_,year,month,day->onPick(LocalDate.of(year,month+1,day).toString())},date.year,date.monthValue-1,date.dayOfMonth).show()}
 @Composable private fun HistoryCard(exam:Exam,expanded:Boolean,selecting:Boolean,checked:Boolean,onCheck:()->Unit,onExpand:()->Unit,onDelete:()->Unit)=Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=if(expanded)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(14.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Row{if(selecting)Checkbox(checked,onCheckedChange={onCheck()});Text(exam.name,fontWeight=FontWeight.Bold)};if(!selecting)TextButton(onDelete){Text("删除")}};Text("${exam.date} · ${exam.schoolYear} ${exam.term} · ${if(exam.kind==ExamKind.COMPREHENSIVE)"综合考试" else "单科测试"} · 得分率 ${formatRate(exam.rate)}");if(expanded){HorizontalDivider(Modifier.padding(vertical=8.dp));exam.subjectScores.forEach{score->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(score.subject);Text("${formatScore(score.score)} / ${formatScore(score.fullScore)} · ${formatRate(score.rate)}",fontWeight=FontWeight.Bold)}}}else if(!selecting)TextButton(onExpand){Text("查看各科成绩")}}}
+@OptIn(ExperimentalLayoutApi::class)
 @Composable private fun ExamEditor(vm:DemoViewModel,onSaved:()->Unit){
-    val context=LocalContext.current; var name by remember{mutableStateOf("月考")}; var date by remember{mutableStateOf(LocalDate.now())}; val scores=remember(vm.subjects){vm.subjects.associateWith{mutableStateOf("")}}; val reasons=listOf("知识点不会","审题错误","计算错误","记忆不牢","时间不足","其他"); var lossSubject by remember{mutableStateOf(vm.subjects.firstOrNull()?:"")}; val lossPoints=remember{mutableStateMapOf<String,String>()}
-    AlertDialog(onDismissRequest=onSaved,title={Text("录入综合考试成绩")},text={Column(Modifier.heightIn(max=540.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-        OutlinedTextField(name,{name=it},label={Text("考试名称")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        OutlinedButton({DatePickerDialog(context,{_,year,month,day->date=LocalDate.of(year,month+1,day)},date.year,date.monthValue-1,date.dayOfMonth).show()},Modifier.fillMaxWidth()){Text("考试日期：$date")}
-        vm.subjects.forEach{subject->OutlinedTextField(scores.getValue(subject).value,{scores.getValue(subject).value=it},label={Text("${subject}（满分 ${formatScore(vm.fullScore(subject))}）")},singleLine=true,modifier=Modifier.fillMaxWidth())}
-        Text("失分原因（选填，可填写对应失分分值）",fontWeight=FontWeight.Bold); vm.subjects.chunked(4).forEach { row->Row{row.forEach { subject->FilterChip(selected=lossSubject==subject,onClick={lossSubject=subject},label={Text(subject)},modifier=Modifier.padding(end=4.dp))}}}; reasons.forEach { reason->OutlinedTextField(lossPoints["$lossSubject|$reason"]?:"",{lossPoints["$lossSubject|$reason"]=it},label={Text("$reason 失分")},suffix={Text("分")},singleLine=true,modifier=Modifier.fillMaxWidth())}
-    }},confirmButton={TextButton({ val items=scores.map{entry->val losses=reasons.mapNotNull { reason->lossPoints["${entry.key}|$reason"]?.toDoubleOrNull()?.takeIf{it>0}?.let{LossRecord(reason,it)} }; SubjectScore(entry.key,entry.value.value.toDoubleOrNull()?:0.0,vm.fullScore(entry.key),losses.map{it.reason},losses)}; vm.saveExam(Exam("new-${System.currentTimeMillis()}",name.ifBlank{"未命名考试"},date.toString(),ExamKind.COMPREHENSIVE,items,vm.student.schoolYear,vm.student.term));onSaved()}){Text("保存")}},dismissButton={TextButton(onSaved){Text("取消")}})
+    val context=LocalContext.current; val isLandscape=LocalConfiguration.current.orientation==Configuration.ORIENTATION_LANDSCAPE; val contentMaxHeight=if(isLandscape)120.dp else 500.dp; var step by remember{mutableIntStateOf(0)}; var name by remember{mutableStateOf("月考")}; var date by remember{mutableStateOf(LocalDate.now())}; val scores=remember(vm.subjects){vm.subjects.associateWith{mutableStateOf("")}}; val reasons=listOf("知识点不会","审题错误","计算错误","记忆不牢","时间不足","其他"); var lossSubject by remember{mutableStateOf(vm.subjects.firstOrNull()?:"")}; val lossPoints=remember{mutableStateMapOf<String,String>()}
+    val stepTitles=listOf("考试信息","分科成绩","失分复盘")
+    fun save(){ val items=scores.map{entry->val losses=reasons.mapNotNull { reason->lossPoints["${entry.key}|$reason"]?.toDoubleOrNull()?.takeIf{it>0}?.let{LossRecord(reason,it)} }; SubjectScore(entry.key,entry.value.value.toDoubleOrNull()?:0.0,vm.fullScore(entry.key),losses.map{it.reason},losses)}; vm.saveExam(Exam("new-${System.currentTimeMillis()}",name.ifBlank{"未命名考试"},date.toString(),ExamKind.COMPREHENSIVE,items,vm.student.schoolYear,vm.student.term));onSaved() }
+    AlertDialog(onDismissRequest=onSaved,title={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){Text("录入综合考试成绩");Text("${step + 1}/3 · ${stepTitles[step]}",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary);LinearProgressIndicator(progress={(step + 1) / 3f},modifier=Modifier.fillMaxWidth())}},text={Column(Modifier.heightIn(max=contentMaxHeight).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        when(step){
+            0->{ if(!isLandscape)Text("先确认这次考试，之后可以逐科录入。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant); OutlinedTextField(name,{name=it},label={Text("考试名称")},supportingText=if(isLandscape)null else { { Text("例如：十月月考") } },singleLine=true,modifier=Modifier.fillMaxWidth());OutlinedButton({DatePickerDialog(context,{_,year,month,day->date=LocalDate.of(year,month+1,day)},date.year,date.monthValue-1,date.dayOfMonth).show()},Modifier.fillMaxWidth()){Text("考试日期：$date")} }
+            1->{ Text("按学科填写实得分，未填写的科目会按 0 分保存。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);vm.subjects.forEach{subject->OutlinedTextField(scores.getValue(subject).value,{scores.getValue(subject).value=it},label={Text("${subject}（满分 ${formatScore(vm.fullScore(subject))}）")},suffix={Text("分")},singleLine=true,modifier=Modifier.fillMaxWidth())} }
+            else->{ Text("选填失分原因，帮助后续分析薄弱点。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Text("选择学科",fontWeight=FontWeight.Bold);FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){vm.subjects.forEach { subject->FilterChip(selected=lossSubject==subject,onClick={lossSubject=subject},label={Text(subject)})}};Text("$lossSubject 的失分",style=MaterialTheme.typography.titleSmall);reasons.forEach { reason->OutlinedTextField(lossPoints["$lossSubject|$reason"]?:"",{lossPoints["$lossSubject|$reason"]=it},label={Text("$reason")},suffix={Text("分")},singleLine=true,modifier=Modifier.fillMaxWidth())} }
+        }
+    }},confirmButton={TextButton({if(step==2)save() else step++}){Text(if(step==2)"保存成绩" else "下一步")}},dismissButton={Row{if(step>0)TextButton({step--}){Text("上一步")};TextButton(onSaved){Text("取消")}}})
 }
