@@ -31,7 +31,7 @@ import com.growthscore.demo.ui.*
 import com.growthscore.demo.update.UpdateFlow
 import kotlinx.coroutines.delay
 
-class MainActivity : ComponentActivity() { override fun onCreate(state: Bundle?) { super.onCreate(state); setContent { GrowthTheme { App() } } } }
+class MainActivity : ComponentActivity() { override fun onCreate(state: Bundle?) { super.onCreate(state); WindowCompat.setDecorFitsSystemWindows(window,false); setContent { GrowthTheme { App() } } } }
 private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录入"), ANALYSIS("分析"), EXPLORE("探索"), PROFILE("我的") }
 @Composable private fun App(){ var splash by remember{mutableStateOf(true)}; LaunchedEffect(Unit){delay(3000);splash=false}; if(splash) Image(painterResource(R.drawable.chaoyue_splash),"超越启动页",Modifier.fillMaxSize(),contentScale=ContentScale.Crop) else GrowthApp() }
 @Composable private fun GrowthApp(vm:DemoViewModel=viewModel()){
@@ -55,13 +55,12 @@ private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录�
             }
         }
     }
-    DisposableEffect(tab,analysisImmersive){
+    DisposableEffect(Unit){
         val activity=context as? android.app.Activity
         val controller=activity?.let { WindowCompat.getInsetsController(it.window,view) }
         controller?.systemBarsBehavior=androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        if(tab==RootTab.ANALYSIS) controller?.hide(WindowInsetsCompat.Type.statusBars()) else controller?.show(WindowInsetsCompat.Type.statusBars())
-        if(tab==RootTab.ANALYSIS && analysisImmersive) controller?.hide(WindowInsetsCompat.Type.navigationBars()) else controller?.show(WindowInsetsCompat.Type.navigationBars())
-        onDispose { }
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
     }
     LaunchedEffect(vm.updateStatus){val status=vm.updateStatus;if(status is UpdateStatus.Found && status.release.version.removePrefix("v")!=vm.currentVersion)updatePrompt=true}
     CompositionLocalProvider(LocalCompactLayout provides compact){
@@ -90,8 +89,7 @@ private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录�
 }
 @Composable private fun LandscapeNavigation(selected:RootTab,onSelect:(RootTab)->Unit)=NavigationRail(
     modifier=Modifier.fillMaxHeight().width(100.dp),
-    containerColor=MaterialTheme.colorScheme.surface,
-    header={ Text("超越",style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary,modifier=Modifier.padding(vertical=18.dp)) }
+    containerColor=MaterialTheme.colorScheme.surface
 ){
     RootTab.entries.forEach { item->
         NavigationRailItem(selected=item==selected,onClick={onSelect(item)},icon={Icon(TabIcon(item),item.label)},label={Text(item.label)},alwaysShowLabel=true)
