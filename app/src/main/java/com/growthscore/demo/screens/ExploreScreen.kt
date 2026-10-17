@@ -33,7 +33,7 @@ fun ExploreScreen() {
     Column(Modifier.fillMaxSize().padding(if(compact)10.dp else 20.dp)) {
         Text("探索",style=if(compact)MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall)
         Text("阅读、学科方法与升学参考",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.padding(top=if(compact)6.dp else 10.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(top=if(compact)8.dp else 12.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             listOf("书单","升学参考").forEach { FilterChip(section==it,{section=it},label={Text(it)}) }
         }
         if(section=="书单") ReadingLibrary(grade,subject,{grade=it},{subject=it}) else UniversityLibrary()
@@ -44,12 +44,12 @@ fun ExploreScreen() {
     val books=(readingBooks + readingElectives).filter { it.grade==grade && (subject=="全部" || it.subject==subject) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(top=12.dp,bottom=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         item {
-            Text("分年级学科素养书单",fontSize=20.sp,fontWeight=FontWeight.Bold)
-            Text("先完成课标必读，再按兴趣和薄弱能力选择选读。每个年级补充约 10 本非英语读物的选读书；书目为阅读建议，请结合教材版本、教师要求和个人阅读基础选择。",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
+            Text("分年级学科素养书单",style=MaterialTheme.typography.titleLarge)
+            Text("先完成课标必读，再按兴趣和薄弱能力选择选读。书目是阅读建议，请结合教材版本、教师要求和个人基础选择。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceRow(listOf("初一","初二","初三","高一","高二","高三"),grade,onGrade)
             ChoiceRow(listOf("全部","语文","数学","英语","理科综合","文科综合"),subject,onSubject)
             val required=books.count { it.kind!="选读" }; val elective=books.count { it.kind=="选读" }
-            Text("${grade}${if(subject=="全部")"全学科" else subject} · $required 本推荐 · $elective 本选读",fontWeight=FontWeight.Medium,modifier=Modifier.padding(top=4.dp))
+            Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=MaterialTheme.shapes.small){Text("${grade}${if(subject=="全部")"全学科" else subject} · $required 本推荐 · $elective 本选读",fontWeight=FontWeight.Medium,modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp))}
         }
         items(books) { BookCard(it) }
         item { ReadingTips() }
@@ -58,11 +58,11 @@ fun ExploreScreen() {
 
 @Composable private fun ChoiceRow(options:List<String>,selected:String,onSelect:(String)->Unit)=Row(Modifier.fillMaxWidth().padding(top=8.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){options.forEach{FilterChip(selected==it,{onSelect(it)},label={Text(it)})}}
 
-@Composable private fun BookCard(book:ReadingBook)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){ Text(book.title,fontWeight=FontWeight.Bold,fontSize=18.sp); AssistChip(onClick={},label={Text(book.subject)}) }
-    Text(book.author,color=Color.Gray,style=MaterialTheme.typography.bodySmall)
-    Text(book.note)
-    Text(book.kind,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Medium,style=MaterialTheme.typography.bodySmall)
+@Composable private fun BookCard(book:ReadingBook)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
+    Text(book.title,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){AssistChip(onClick={},label={Text(book.subject)});AssistChip(onClick={},label={Text(book.kind)})}
+    Text(book.author,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+    Text(book.note,style=MaterialTheme.typography.bodyMedium)
 } }
 
 @Composable private fun ReadingTips()=Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
@@ -88,18 +88,18 @@ fun ExploreScreen() {
 }
 
 @Composable private fun UniversityCard(school:University)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-    Text(school.name,fontWeight=FontWeight.Bold,fontSize=21.sp)
+    Text(school.name,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
     Text("${school.city} · ${school.tags}",color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Medium)
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) { CampusPhoto(school.gate,"${school.name}校门",Modifier.weight(1f)); CampusPhoto(school.landmark,"${school.name}标志性景观",Modifier.weight(1f)) }
     Text("优势专业：${school.majors}")
     Text("近年本科招生规模：${school.enrollment}")
     Text("近年分数参考：${school.score}",fontWeight=FontWeight.Medium)
-    Text(school.imageSource,style=MaterialTheme.typography.labelSmall,color=Color.Gray)
+    Text(school.imageSource,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
 } }
 
 @Composable private fun SchoolDetailCard(school:SchoolDetail)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-    Text(school.tier,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Medium,style=MaterialTheme.typography.labelLarge)
-    Text(school.name,fontWeight=FontWeight.Bold,fontSize=20.sp)
+    AssistChip(onClick={},label={Text(school.tier)})
+    Text(school.name,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
     Text("优势专业：${school.majors}")
     Text("年招生规模：${school.enrollment}")
     Text("录取分数参考：${school.score}",fontWeight=FontWeight.Medium)
