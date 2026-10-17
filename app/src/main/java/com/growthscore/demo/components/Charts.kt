@@ -21,12 +21,13 @@ import kotlin.math.*
     val min=70f; val max=100f
     Canvas(modifier.fillMaxWidth().height(chartHeight).pointerInput(values) { detectTapGestures { tap -> if(values.size>1 && onPointClick!=null) { val left=48f; val step=(size.width-left)/(values.size-1); onPointClick((((tap.x-left)/step).roundToInt()).coerceIn(0,values.lastIndex)) } } }) {
         if(values.size<2) return@Canvas
-        val left=48f; val top=12f; val bottom=size.height-28f; val step=(size.width-left)/(values.size-1)
+        // Keep grid ticks, point labels and the surrounding card copy in distinct vertical bands.
+        val left=48f; val top=12f; val axisLabelArea=52f; val bottom=size.height-axisLabelArea; val step=(size.width-left)/(values.size-1)
         val paint=android.graphics.Paint().apply { this.color=android.graphics.Color.rgb(102,112,128); textSize=22f; textAlign=android.graphics.Paint.Align.RIGHT }
         listOf(100,95,90,85,80,75,70).forEach { tick -> val y=bottom-(tick-min)/(max-min)*(bottom-top); drawLine(Color(0xFFE4EAF4),Offset(left,y),Offset(size.width,y),1f); drawContext.canvas.nativeCanvas.drawText(tick.toString(),left-8f,y+7f,paint) }
         val points=values.mapIndexed { index,value -> Offset(left+index*step,bottom-((value.toFloat()-min)/(max-min)*(bottom-top)).coerceIn(0f,bottom-top)) }
         val path=Path().apply { moveTo(points.first().x,points.first().y); points.drop(1).forEach { lineTo(it.x,it.y) } }
-        drawPath(path,color,style=Stroke(4f,cap=StrokeCap.Round)); points.forEachIndexed { index,point -> drawCircle(color,7f,point); drawCircle(Color.White,3f,point); if(labels.isNotEmpty()&&(index==0||index==points.lastIndex||values.size<=5)){paint.textAlign=android.graphics.Paint.Align.CENTER;drawContext.canvas.nativeCanvas.drawText(labels.getOrElse(index){""}.take(6),point.x,bottom+23f,paint)} }
+        drawPath(path,color,style=Stroke(4f,cap=StrokeCap.Round)); points.forEachIndexed { index,point -> drawCircle(color,7f,point); drawCircle(Color.White,3f,point); if(labels.isNotEmpty()&&(index==0||index==points.lastIndex||values.size<=5)){paint.textAlign=android.graphics.Paint.Align.CENTER;drawContext.canvas.nativeCanvas.drawText(labels.getOrElse(index){""}.take(6),point.x,bottom+35f,paint)} }
     }
 }
 @Composable fun RadarChart(values: List<Pair<String, Double>>, modifier: Modifier = Modifier.size(270.dp), compactLandscape: Boolean = false) {
