@@ -50,9 +50,12 @@ import com.growthscore.demo.ui.*
 @Composable private fun StudentInfo(vm:DemoViewModel,onEdit:()->Unit) { val s=vm.student; Column(Modifier.padding(16.dp)) { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Column(Modifier.weight(1f)) { Text("学生信息",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("姓名：${s.name}"); Text("${s.grade} · ${s.term}"); Text(s.schoolYear); HealthSummary(s) }; StudentAvatar(s.avatarUri,Modifier.size(72.dp)) }; TextButton(onEdit){Text("编辑资料")} } }
 
 @Composable private fun HealthSummary(s:Student) { val age=s.age; val sex=s.sex; val height=s.heightCm; val weight=s.weightKg; if(age==null||height==null||weight==null) return
-    val ref=referenceFor(age,sex); val bmi=weight/(height/100.0)/(height/100.0); val heightDiff=height-ref.first; val weightDiff=weight-ref.second
+    val bmi=weight/(height/100.0)/(height/100.0)
+    HorizontalDivider(Modifier.padding(vertical=8.dp)); Text("健康参考",fontWeight=FontWeight.Bold)
+    if(sex !in listOf("男","女")) { Text("BMI ${format1(bmi)}。填写性别后，可显示同龄参考身高、体重差距。",style=MaterialTheme.typography.bodySmall); Text("仅作健康教育参考，不代替医生评估。",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant); return }
+    val ref=referenceFor(age,sex); val heightDiff=height-ref.first; val weightDiff=weight-ref.second
     val heightLabel=when { heightDiff<=-7 -> "偏矮倾向"; heightDiff>=7 -> "偏高倾向"; else -> "身高参考范围内" }; val weightLabel=when { weightDiff<=-ref.second*.15 -> "偏瘦倾向"; weightDiff>=ref.second*.15 -> "偏重倾向"; else -> "体重参考范围内" }
-    HorizontalDivider(Modifier.padding(vertical=8.dp)); Text("健康参考",fontWeight=FontWeight.Bold); Text("$heightLabel：${format1(heightDiff)} cm；$weightLabel：${format1(weightDiff)} kg；BMI ${format1(bmi)}",style=MaterialTheme.typography.bodySmall); Text("同龄同性别中位参考值：${format1(ref.first)} cm / ${format1(ref.second)} kg。仅作健康教育参考，不代替医生评估。",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("$heightLabel：${format1(heightDiff)} cm；$weightLabel：${format1(weightDiff)} kg；BMI ${format1(bmi)}",style=MaterialTheme.typography.bodySmall); Text("同龄同性别中位参考值：${format1(ref.first)} cm / ${format1(ref.second)} kg。仅作健康教育参考，不代替医生评估。",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 private fun referenceFor(age:Int,sex:String):Pair<Double,Double> { val a=age.coerceIn(12,18); val boys=listOf(151.0 to 40.0,159.0 to 46.0,165.0 to 52.0,169.0 to 57.0,172.0 to 61.0,173.0 to 64.0,174.0 to 66.0); val girls=listOf(153.0 to 41.0,157.0 to 46.0,159.0 to 50.0,160.0 to 52.0,160.0 to 54.0,160.0 to 55.0,160.0 to 56.0); return if(sex=="女")girls[a-12] else boys[a-12] }
