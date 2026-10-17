@@ -41,7 +41,7 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     val fullScores get() = data.fullScores
     val studyPlans get() = data.plans
     val activeStudyPlans get() = data.plans.filter { it.status==StudyPlanStatus.ACTIVE }
-    val latest get() = exams.last()
+    val latest get() = exams.lastOrNull() ?: Exam("empty","暂无成绩","",ExamKind.COMPREHENSIVE,emptyList(),student.schoolYear,student.term)
     val currentVersion = BuildConfig.VERSION_NAME
     var updateStatus by mutableStateOf<UpdateStatus>(UpdateStatus.Idle); private set
     var downloadStatus by mutableStateOf<DownloadStatus>(DownloadStatus.Idle); private set
@@ -88,7 +88,11 @@ class DemoViewModel(application: Application) : AndroidViewModel(application) {
     fun updateGoals(values: Map<String, Double>, term: String = "当前学期", enabled: Boolean = true) {
         persist(data.copy(goals = data.subjects.map { subject -> SubjectGoal(subject, (values[subject] ?: 90.0).coerceIn(0.0, 100.0), term, enabled) }))
     }
-    fun updateStudent(name: String, grade: String, term: String, year: String, avatarUri:String=data.student.avatarUri) { persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" },avatarUri))) }
+    fun updateStudent(name: String, grade: String, term: String, year: String, avatarUri:String=data.student.avatarUri, sex:String=data.student.sex, age:Int?=data.student.age, heightCm:Double?=data.student.heightCm, weightKg:Double?=data.student.weightKg) {
+        val changedTerm=grade!=data.student.grade || term!=data.student.term || year!=data.student.schoolYear
+        persist(data.copy(student = Student(name.trim().ifBlank { "未命名同学" }, grade.trim().ifBlank { "未设置" }, term.trim().ifBlank { "未设置" }, year.trim().ifBlank { "未设置" },avatarUri,sex,age,heightCm,weightKg),plans=if(changedTerm)data.plans.map { it.copy(status=StudyPlanStatus.ENDED) } else data.plans))
+    }
+    fun clearAllData() { data=store.clear() }
     fun updateSubjects(items: List<String>) {
         val clean = items.map(String::trim).filter(String::isNotBlank).distinct()
         if (clean.isNotEmpty()) persist(data.copy(subjects = clean, goals = clean.map { subject -> SubjectGoal(subject, data.goals.find { it.subject == subject }?.target ?: 90.0) }, fullScores=clean.associateWith { data.fullScores[it] ?: 100.0 }))

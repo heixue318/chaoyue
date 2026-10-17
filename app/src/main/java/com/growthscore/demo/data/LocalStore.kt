@@ -10,13 +10,12 @@ import android.util.Base64
 class LocalStore(context: Context) {
     private val prefs = context.getSharedPreferences("chaoyue_local_data", Context.MODE_PRIVATE)
 
-    fun load(): AppData = prefs.getString("data", null)?.let(::decode) ?: AppData(
-        DemoRepository.student, DemoRepository.subjects, (DemoRepository.exams + DemoRepository.subjectTests).sortedBy { it.date }, DemoRepository.initialGoals
-    )
+    fun load(): AppData = prefs.getString("data", null)?.let(::decode) ?: emptyData()
 
     fun save(data: AppData) {
         prefs.edit().putString("data", encode(data)).apply()
     }
+    fun clear(): AppData { prefs.edit().remove("data").apply(); return emptyData() }
     fun exportCsv(data: AppData): String = "超越完整数据备份,1\nJSON_BASE64,${Base64.encodeToString(encode(data).toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}\n"
     fun importCsv(raw: String): AppData {
         val lines=raw.lineSequence().filter { it.isNotBlank() }.toList()
@@ -28,7 +27,7 @@ class LocalStore(context: Context) {
     }
 
     private fun encode(data: AppData) = JSONObject().apply {
-        put("student", JSONObject().apply { put("name", data.student.name); put("grade", data.student.grade); put("term", data.student.term); put("year", data.student.schoolYear); put("avatarUri",data.student.avatarUri) })
+        put("student", JSONObject().apply { put("name", data.student.name); put("grade", data.student.grade); put("term", data.student.term); put("year", data.student.schoolYear); put("avatarUri",data.student.avatarUri); put("sex",data.student.sex); put("age",data.student.age ?: JSONObject.NULL); put("heightCm",data.student.heightCm ?: JSONObject.NULL); put("weightKg",data.student.weightKg ?: JSONObject.NULL) })
         put("subjects", JSONArray(data.subjects))
         put("fullScores", JSONObject().apply { data.fullScores.forEach { (subject, score) -> put(subject, score) } })
         put("goals", JSONArray().apply { data.goals.forEach { put(JSONObject().apply { put("subject", it.subject); put("target", it.target); put("term", it.term); put("enabled", it.enabled) }) } })
@@ -43,7 +42,7 @@ class LocalStore(context: Context) {
 
     private fun decode(raw: String): AppData = JSONObject(raw).let { root ->
         val studentJson = root.getJSONObject("student")
-        val student = Student(studentJson.getString("name"), studentJson.getString("grade"), studentJson.getString("term"), studentJson.getString("year"),studentJson.optString("avatarUri", ""))
+        val student = Student(studentJson.getString("name"), studentJson.getString("grade"), studentJson.getString("term"), studentJson.getString("year"),studentJson.optString("avatarUri", ""),studentJson.optString("sex","未设置"),if(studentJson.isNull("age")) null else studentJson.optInt("age"),if(studentJson.isNull("heightCm")) null else studentJson.optDouble("heightCm"),if(studentJson.isNull("weightKg")) null else studentJson.optDouble("weightKg"))
         fun strings(array: JSONArray) = List(array.length()) { array.getString(it) }
         val subjects = strings(root.getJSONArray("subjects"))
         val fullScoresJson=root.optJSONObject("fullScores"); val fullScores=subjects.associateWith { fullScoresJson?.optDouble(it,100.0) ?: 100.0 }
@@ -81,6 +80,8 @@ class LocalStore(context: Context) {
         val tasks=item.optJSONArray("tasks")?.let { values -> List(values.length()) { i -> values.getJSONObject(i).let { task -> PlanTask(task.getString("id"),task.getString("subject"),task.getString("title"),task.optString("description"),task.getString("date"),task.optInt("minutes",15),runCatching { PlanTaskStatus.valueOf(task.optString("status","PENDING")) }.getOrDefault(PlanTaskStatus.PENDING),if(task.isNull("completedAt"))null else task.optLong("completedAt")) } } } ?: emptyList()
         return StudyPlan(item.getString("id"),item.getString("name"),runCatching { StudyPlanType.valueOf(item.optString("type","CUSTOM")) }.getOrDefault(StudyPlanType.CUSTOM),item.getString("start"),item.getString("end"),runCatching { StudyPlanStatus.valueOf(item.optString("status","ACTIVE")) }.getOrDefault(StudyPlanStatus.ACTIVE),intMap("availability"),subjectMinutes(),focus,tasks,item.optLong("createdAt",System.currentTimeMillis()))
     }
+
+    private fun emptyData()=AppData(Student("未命名同学","未设置","未设置","未设置"),emptyList(),emptyList(),emptyList())
 }
 
 data class AppData(val student: Student, val subjects: List<String>, val exams: List<Exam>, val goals: List<SubjectGoal>, val fullScores: Map<String, Double> = emptyMap(), val plans:List<StudyPlan> = emptyList())

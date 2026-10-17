@@ -1,5 +1,6 @@
 package com.growthscore.demo.screens
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +52,7 @@ fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Bo
 
 @Composable private fun OverallAnalysis(vm: DemoViewModel) {
     val compact=LocalCompactLayout.current
+    if(vm.exams.isEmpty()) { Column(Modifier.fillMaxSize().padding(top=24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) { Text("暂无成绩数据",fontSize=21.sp,fontWeight=FontWeight.Bold); Text("请先到“成绩录入”保存一场考试，之后即可查看成长曲线和雷达图。",color=Color.Gray) }; return }
     val latest = vm.latest; var selected by remember { mutableStateOf(vm.exams.lastIndex) }
     val summary:@Composable ()->Unit = {
         Column(Modifier.fillMaxWidth()) {
@@ -123,12 +126,12 @@ private fun stabilityOf(values:List<Double>):Stability { if(values.size<3)return
 private fun trendOf(values:List<Double>)=when { values.size<2->"数据不足"; values.last()-values.first()>2->"近期上升"; values.first()-values.last()>2->"近期回落"; else->"近期基本持平" }
 
 @Composable private fun PhaseReport(vm:DemoViewModel) {
-    var range by rememberSaveable { mutableStateOf("当前学期") }; var from by rememberSaveable { mutableStateOf("") }; var to by rememberSaveable { mutableStateOf("") }; var exportMessage by remember { mutableStateOf<String?>(null) }
+    var range by rememberSaveable { mutableStateOf("当前学期") }; var from by rememberSaveable { mutableStateOf("") }; var to by rememberSaveable { mutableStateOf("") }; var exportMessage by remember { mutableStateOf<String?>(null) }; val context=LocalContext.current
     val all=vm.exams.filter { it.kind==ExamKind.COMPREHENSIVE }; val records=all.filter { exam -> when(range) { "当前学期"->exam.term==vm.student.term; "当前学年"->exam.schoolYear==vm.student.schoolYear; "指定年级"->true; else->(from.isBlank()||exam.date>=from)&&(to.isBlank()||exam.date<=to) } }
     val average=records.map{it.rate}.average(); val delta=if(records.size>=2)records.last().rate-records.first().rate else null
     Column(Modifier.fillMaxSize().padding(top=14.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("阶段成长报告",fontSize=21.sp,fontWeight=FontWeight.Bold); Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("当前学期","当前学年","指定年级","自定义").forEach { FilterChip(selected=range==it,onClick={range=it},label={Text(it)}) }}
-        if(range=="自定义") Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(from,{from=it},label={Text("开始日期")},modifier=Modifier.weight(1f));OutlinedTextField(to,{to=it},label={Text("结束日期")},modifier=Modifier.weight(1f))}
+        if(range=="自定义") Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton({pickPhaseDate(context,from){from=it}},Modifier.weight(1f)){Text(if(from.isBlank())"开始日期" else from)};OutlinedButton({pickPhaseDate(context,to){to=it}},Modifier.weight(1f)){Text(if(to.isBlank())"结束日期" else to)}}
         if(records.isEmpty()) Text("该范围暂无综合考试记录。") else { Button({exportMessage=vm.exportReportImage(range,records).getOrElse{"导出失败：${it.message}"}}){Text("导出报告图片")}; Card { Column(Modifier.padding(18.dp)) { Text("综合表现",fontWeight=FontWeight.Bold);Text("综合平均得分率 ${formatRate(average)}",fontSize=26.sp,fontWeight=FontWeight.Bold);Text(if(delta==null)"仅 1 次综合考试，显示成绩但不判断增长趋势。" else "首末两次可比综合考试变化 ${if(delta>=0)"+" else ""}${formatScore(delta)} 个百分点",color=if((delta?:0.0)>=0)Green else MaterialTheme.colorScheme.error);LineChart(records.map{it.rate},labels=records.map{it.name}) } }
             val common=records.first().subjectScores.map{it.subject}.toSet().intersect(records.last().subjectScores.map{it.subject}.toSet()); Card { Column(Modifier.padding(18.dp)) { Text("学科变化",fontWeight=FontWeight.Bold); common.forEach { subject->val a=records.first().subjectScores.first{it.subject==subject}.rate;val b=records.last().subjectScores.first{it.subject==subject}.rate;Text("$subject：${if(b-a>=0)"+" else ""}${formatScore(b-a)} 个百分点") }; if(common.size!=records.first().subjectScores.size||common.size!=records.last().subjectScores.size)Text("学科组合不同，仅比较共同学科；综合成绩不直接比较。",style=MaterialTheme.typography.bodySmall,color=Color.Gray) } }
             Card { Column(Modifier.padding(18.dp)) { Text("成长总结",fontWeight=FontWeight.Bold);Text("${if(delta==null)"继续积累同类综合考试记录。" else if(delta>=0)"本阶段综合得分率较起点提高。" else "本阶段综合得分率较起点回落。"} 不同试卷难度会影响分数，不直接据此判断学习能力变化。") } }
@@ -136,6 +139,7 @@ private fun trendOf(values:List<Double>)=when { values.size<2->"数据不足"; v
     }
     exportMessage?.let { message->AlertDialog(onDismissRequest={exportMessage=null},title={Text("阶段报告")},text={Text(message)},confirmButton={TextButton({exportMessage=null}){Text("知道了")}}) }
 }
+private fun pickPhaseDate(context:android.content.Context,initial:String,onPick:(String)->Unit){val date=runCatching{java.time.LocalDate.parse(initial)}.getOrDefault(java.time.LocalDate.now());DatePickerDialog(context,{_,year,month,day->onPick(java.time.LocalDate.of(year,month+1,day).toString())},date.year,date.monthValue-1,date.dayOfMonth).show()}
 @Composable private fun ExamCompare(vm:DemoViewModel) {
     val exams=vm.exams.filter{it.kind==ExamKind.COMPREHENSIVE}; var aIndex by rememberSaveable{mutableStateOf(0)};var bIndex by rememberSaveable{mutableStateOf((exams.size-1).coerceAtLeast(0))};var menuA by remember{mutableStateOf(false)};var menuB by remember{mutableStateOf(false)}; if(exams.isEmpty())return
     val a=exams[aIndex.coerceIn(0,exams.lastIndex)];val b=exams[bIndex.coerceIn(0,exams.lastIndex)];val common=a.subjectScores.map{it.subject}.toSet().intersect(b.subjectScores.map{it.subject}.toSet()); val comparable=common.size==a.subjectScores.size&&common.size==b.subjectScores.size

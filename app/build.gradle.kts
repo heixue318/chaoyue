@@ -18,8 +18,8 @@ android {
         applicationId = "com.growthscore.demo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.4.6"
+        versionCode = 21
+        versionName = "1.5.0"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

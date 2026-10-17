@@ -1,5 +1,6 @@
 package com.growthscore.demo.screens
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,13 +51,13 @@ fun PlanScreen(vm:DemoViewModel) {
 @Composable private fun PlanCreator(vm:DemoViewModel,onCreated:()->Unit,onCancel:()->Unit) {
     var typeName by rememberSaveable { mutableStateOf("学期") }
     var name by rememberSaveable { mutableStateOf("我的学习计划") }
-    var start by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    var end by rememberSaveable { mutableStateOf(LocalDate.now().plusDays(27).toString()) }
+    var start by rememberSaveable { mutableStateOf(LocalDate.now()) }
+    var end by rememberSaveable { mutableStateOf(LocalDate.now().plusDays(27)) }
     var weekday by rememberSaveable { mutableStateOf("40") }
     var weekend by rememberSaveable { mutableStateOf("60") }
     var enabled by remember { mutableStateOf(vm.subjects.toSet()) }
     var message by remember { mutableStateOf<String?>(null) }
-    val type=when(typeName){"寒假"->StudyPlanType.WINTER_BREAK;"暑假"->StudyPlanType.SUMMER_BREAK;"自定义"->StudyPlanType.CUSTOM;else->StudyPlanType.TERM}
+    val type=when(typeName){"寒假"->StudyPlanType.WINTER_BREAK;"暑假"->StudyPlanType.SUMMER_BREAK;"自定义"->StudyPlanType.CUSTOM;else->StudyPlanType.TERM}; val context=LocalContext.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text("新建学习计划",fontSize=21.sp,fontWeight=FontWeight.Bold); TextButton(onCancel){Text("取消")} }
         Text("新计划不会替换已有计划。假日或自定义计划可以与学期计划叠加执行。",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
@@ -63,7 +65,7 @@ fun PlanScreen(vm:DemoViewModel) {
             Text("1. 计划类型与日期",fontWeight=FontWeight.Bold)
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("学期","寒假","暑假","自定义").forEach{FilterChip(typeName==it,{typeName=it},label={Text(it)})}}
             OutlinedTextField(name,{name=it},label={Text("计划名称")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(start,{start=it},label={Text("开始日期")},placeholder={Text("2026-10-15")},modifier=Modifier.weight(1f),singleLine=true);OutlinedTextField(end,{end=it},label={Text("结束日期")},modifier=Modifier.weight(1f),singleLine=true)}
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){DateButton("开始日期",start,Modifier.weight(1f)){start=it};DateButton("结束日期",end,Modifier.weight(1f)){end=it}}
         } }
         Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("2. 可用自主学习时间",fontWeight=FontWeight.Bold)
@@ -78,7 +80,7 @@ fun PlanScreen(vm:DemoViewModel) {
         } }
         Button(onClick={
             val week=(weekday.toIntOrNull()?:0).coerceIn(0,600); val rest=(weekend.toIntOrNull()?:0).coerceIn(0,600)
-            vm.createStudyPlan(name,type,start,end,mapOf(1 to week,2 to week,3 to week,4 to week,5 to week,6 to rest,7 to rest),enabled.toList()).onSuccess { onCreated() }.onFailure { message=it.message ?: "生成计划失败" }
+            vm.createStudyPlan(name,type,start.toString(),end.toString(),mapOf(1 to week,2 to week,3 to week,4 to week,5 to week,6 to rest,7 to rest),enabled.toList()).onSuccess { onCreated() }.onFailure { message=it.message ?: "生成计划失败" }
         },modifier=Modifier.fillMaxWidth(),enabled=enabled.isNotEmpty()){Text("生成并启用学习计划")}
         message?.let{Text(it,color=MaterialTheme.colorScheme.error)}
     }
@@ -101,6 +103,8 @@ fun PlanScreen(vm:DemoViewModel) {
 }
 
 private fun planTypeLabel(type:StudyPlanType)=when(type){StudyPlanType.TERM->"学期计划";StudyPlanType.WINTER_BREAK->"寒假计划";StudyPlanType.SUMMER_BREAK->"暑假计划";StudyPlanType.CUSTOM->"自定义计划"}
+
+@Composable private fun DateButton(label:String,date:LocalDate,modifier:Modifier=Modifier,onChange:(LocalDate)->Unit) { val context=LocalContext.current; OutlinedButton({DatePickerDialog(context,{_,year,month,day->onChange(LocalDate.of(year,month+1,day))},date.year,date.monthValue-1,date.dayOfMonth).show()},modifier){Text("$label：$date")} }
 
 @Composable fun PlanTaskLine(task:PlanTask,enabled:Boolean=true,onToggle:()->Unit) = Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
     Checkbox(task.status==PlanTaskStatus.COMPLETED,onCheckedChange={onToggle()},enabled=enabled)
