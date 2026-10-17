@@ -2,6 +2,7 @@ package com.growthscore.demo.screens
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -42,8 +43,14 @@ fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Bo
             Box(Modifier.weight(1f)) {
                 when(section) {
                     0 -> OverallAnalysis(vm)
-                    1 -> { SecondaryAnalysisTabs(listOf("单科成长","目标差距"),detail){detail=it}; if(detail==0) SingleSubjectAnalysis(vm) else GoalGapAnalysis(vm) }
-                    else -> { SecondaryAnalysisTabs(listOf("阶段报告","考试对比","学习计划"),detail){detail=it}; when(detail){0->PhaseReport(vm);1->ExamCompare(vm);else->PlanScreen(vm)} }
+                    1 -> Column(Modifier.fillMaxSize()) {
+                        SecondaryAnalysisTabs(listOf("单科成长","目标差距"),detail){detail=it}
+                        Box(Modifier.weight(1f)) { if(detail==0) SingleSubjectAnalysis(vm) else GoalGapAnalysis(vm) }
+                    }
+                    else -> Column(Modifier.fillMaxSize()) {
+                        SecondaryAnalysisTabs(listOf("阶段报告","考试对比","学习计划"),detail){detail=it}
+                        Box(Modifier.weight(1f)) { when(detail){0->PhaseReport(vm);1->ExamCompare(vm);else->PlanScreen(vm)} }
+                    }
                 }
             }
         }
@@ -123,6 +130,7 @@ private data class GoalGapRow(val score:SubjectScore,val target:Double) {
 }
 @Composable private fun GoalHeader()=Row(Modifier.fillMaxWidth()){Text("学科",Modifier.weight(1.0f),fontWeight=FontWeight.Bold);Text("当前 / 目标",Modifier.weight(1.35f),fontWeight=FontWeight.Bold);Text("距离目标",Modifier.weight(1.05f),fontWeight=FontWeight.Bold)}
 @Composable private fun GoalGapItem(row:GoalGapRow)=Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Text(row.score.subject,Modifier.weight(1.0f),fontWeight=FontWeight.Medium);Column(Modifier.weight(1.35f)){Text("${formatRate(row.score.rate)} / ${formatRate(row.target)}");Text("${formatScore(row.score.score)} / ${formatScore(row.score.fullScore)}分  →  ${formatScore(row.targetScore)} / ${formatScore(row.score.fullScore)}分",style=MaterialTheme.typography.bodySmall,color=Color.Gray)};Column(Modifier.weight(1.05f)){if(row.achieved)Text("已达标",color=Green,fontWeight=FontWeight.Bold) else {Text("还差 ${ceil(row.missingPoints).toInt()} 分",color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Bold);Text("差 ${formatScore(row.missingRate)} pp",style=MaterialTheme.typography.bodySmall,color=Color.Gray)}}}
+@OptIn(ExperimentalLayoutApi::class)
 @Composable private fun SingleSubjectAnalysis(vm: DemoViewModel) {
     var subject by remember(vm.subjects) { mutableStateOf(vm.subjects.firstOrNull() ?: "") }
     val values = vm.exams.mapNotNull { it.subjectScores.find { score -> score.subject == subject }?.rate }
@@ -132,7 +140,9 @@ private data class GoalGapRow(val score:SubjectScore,val target:Double) {
     val lossTotals=lossLabels.map { label -> label to vm.exams.flatMap { exam -> exam.subjectScores.find { it.subject==subject }?.losses.orEmpty() }.filter { it.reason==label }.sumOf { it.points } }; val largestLoss=lossTotals.maxOfOrNull { it.second }?:0.0; val lossRadar=lossTotals.map { it.first to if(largestLoss>0)it.second/largestLoss*100 else 0.0 }
     val stability=stabilityOf(comparable)
     Column(Modifier.padding(top = 18.dp).verticalScroll(rememberScrollState())) {
-        vm.subjects.chunked(4).forEach { row -> Row { row.forEach { item -> FilterChip(selected = item == subject, onClick = { subject = item }, label = { Text(item) }, modifier = Modifier.padding(end = 8.dp)) } } }
+        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            vm.subjects.forEach { item -> FilterChip(selected = item == subject,onClick = { subject = item },label = { Text(item) }) }
+        }
         Card(Modifier.fillMaxWidth().padding(top = 18.dp)) { Column(Modifier.padding(20.dp)) { Text("${subject}成长曲线（纵轴：得分率 %）"); LineChart(values,labels=vm.exams.map{it.name}); Text(if(values.isEmpty()) "暂无该学科记录" else "平均得分率：${formatRate(values.average())}  最高：${formatRate(values.max())}") } }
         Card(Modifier.fillMaxWidth().padding(top=12.dp)) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) { Text("近期成绩稳定性",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("成绩水平：${if(values.isEmpty()) "暂无记录" else levelFor(values.last())}"); Text("发展趋势：${trendOf(comparable)}"); Text("稳定性：${stability.label}",color=if(stability.label=="波动较大") MaterialTheme.colorScheme.error else Green,fontWeight=FontWeight.Bold); Text(stability.detail,style=MaterialTheme.typography.bodySmall,color=Color.Gray); Text("稳定性只描述近期成绩波动，不代表学科水平高低。",style=MaterialTheme.typography.bodySmall,color=Color.Gray) } }
         if(lossRadar.any { it.second>0 }) Card(Modifier.fillMaxWidth().padding(top=12.dp)) { Column(Modifier.padding(20.dp)) { Text("${subject}失分原因雷达图",fontSize=19.sp,fontWeight=FontWeight.Bold); Text("按已记录的失分分值累计，仅供复盘定位常见问题。",style=MaterialTheme.typography.bodySmall,color=Color.Gray); RadarChart(lossRadar,Modifier.fillMaxWidth().aspectRatio(1f)) } }
