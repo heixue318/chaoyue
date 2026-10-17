@@ -29,26 +29,33 @@ import kotlin.math.ceil
 @Composable
 fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Boolean) -> Unit) {
     val compact=LocalCompactLayout.current
-    var tab by remember { mutableStateOf(0) }
+    var section by rememberSaveable { mutableStateOf(0) }
+    var detail by rememberSaveable { mutableStateOf(0) }
     BackHandler(enabled=immersive) { onImmersiveChange(false) }
     Box(Modifier.fillMaxSize().pointerInput(immersive) { detectTapGestures(onDoubleTap={ onImmersiveChange(!immersive) }) }) {
         Column(Modifier.fillMaxSize().padding(if(immersive) 0.dp else if(compact)8.dp else 16.dp)) {
             if(!immersive) {
                 Text("分析中心", style = if(compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall)
                 Text("把成绩变化转化为下一步行动",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                ScrollableTabRow(selectedTabIndex = tab,edgePadding=0.dp,divider={ HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.45f)) }) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试") })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长") })
-                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("目标差距") })
-                    Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("阶段报告") })
-                    Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("考试对比") })
-                    Tab(selected = tab == 5, onClick = { tab = 5 }, text = { Text("学习计划") })
+                PrimaryAnalysisTabs(section) { section=it; detail=0 }
+            }
+            Box(Modifier.weight(1f)) {
+                when(section) {
+                    0 -> OverallAnalysis(vm)
+                    1 -> { SecondaryAnalysisTabs(listOf("单科成长","目标差距"),detail){detail=it}; if(detail==0) SingleSubjectAnalysis(vm) else GoalGapAnalysis(vm) }
+                    else -> { SecondaryAnalysisTabs(listOf("阶段报告","考试对比","学习计划"),detail){detail=it}; when(detail){0->PhaseReport(vm);1->ExamCompare(vm);else->PlanScreen(vm)} }
                 }
             }
-            Box(Modifier.weight(1f)) { when(tab) { 0->OverallAnalysis(vm); 1->SingleSubjectAnalysis(vm); 2->GoalGapAnalysis(vm); 3->PhaseReport(vm); 4->ExamCompare(vm); else->PlanScreen(vm) } }
         }
         if(immersive) IconButton(onClick={onImmersiveChange(false)},modifier=Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp)) { Icon(Icons.Default.FullscreenExit,"退出全屏") }
     }
+}
+
+@Composable private fun PrimaryAnalysisTabs(selected:Int,onSelect:(Int)->Unit) = TabRow(selectedTabIndex=selected,divider={HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.45f))}) {
+    listOf("总览","学科","报告与计划").forEachIndexed { index,label -> Tab(selected=index==selected,onClick={onSelect(index)},text={Text(label,maxLines=1)}) }
+}
+@Composable private fun SecondaryAnalysisTabs(items:List<String>,selected:Int,onSelect:(Int)->Unit) = Row(Modifier.fillMaxWidth().padding(top=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    items.forEachIndexed { index,label -> FilterChip(selected=index==selected,onClick={onSelect(index)},label={Text(label)}) }
 }
 
 @Composable private fun OverallAnalysis(vm: DemoViewModel) {
@@ -63,14 +70,23 @@ fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Bo
     }
     val radar:@Composable ()->Unit = {
         Column(Modifier.fillMaxWidth()) {
-            Card { Column(Modifier.padding(if(compact)12.dp else 20.dp)) { Text("学科能力雷达图（学科 · 得分率）"); RadarChart(latest.subjectScores.map { it.subject to it.rate },if(compact) Modifier.fillMaxWidth().height(250.dp) else Modifier.fillMaxWidth().aspectRatio(1f),compactLandscape=compact) } }
-            Card(Modifier.fillMaxWidth().padding(top = 16.dp)) { Column(Modifier.padding(20.dp)) { Text("本次报告"); Text("可在“目标差距”中按差距或失分数查看本次考试的学科情况。") } }
+            Card { Column(Modifier.padding(if(compact)12.dp else 20.dp)) { Text("学科能力分布",style=MaterialTheme.typography.titleMedium); Text("得分率越靠近外圈，表示本次表现越稳定。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant); RadarChart(latest.subjectScores.map { it.subject to it.rate },if(compact) Modifier.fillMaxWidth().height(250.dp) else Modifier.fillMaxWidth().aspectRatio(1f),compactLandscape=compact) } }
+            AnalysisInsight(latest.subjectScores.map { it.subject to it.rate },Modifier.padding(top=16.dp))
         }
     }
     if(compact) Row(Modifier.fillMaxSize().padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { summary() }
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { radar() }
     } else Column(Modifier.fillMaxSize().padding(top = 18.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) { summary(); radar() }
+}
+
+@Composable private fun AnalysisInsight(scores:List<Pair<String,Double>>,modifier:Modifier=Modifier) {
+    val focus=scores.minByOrNull { it.second }; val strength=scores.maxByOrNull { it.second }
+    Card(modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+        Text("下一步建议",style=MaterialTheme.typography.titleMedium)
+        if(focus!=null) Text("优先投入 ${focus.first}：当前 ${formatRate(focus.second)}，先从错题和失分原因开始复盘。")
+        if(strength!=null && strength!=focus) Text("继续保持 ${strength.first}：当前 ${formatRate(strength.second)}，用稳定练习巩固优势。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSecondaryContainer)
+    } }
 }
 
 @Composable private fun GoalGapAnalysis(vm: DemoViewModel) {

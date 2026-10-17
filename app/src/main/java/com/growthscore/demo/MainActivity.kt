@@ -62,19 +62,37 @@ private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录�
     }
     LaunchedEffect(vm.updateStatus){val status=vm.updateStatus;if(status is UpdateStatus.Found && status.release.version.removePrefix("v")!=vm.currentVersion)updatePrompt=true}
     CompositionLocalProvider(LocalCompactLayout provides compact){
-        Scaffold(bottomBar={if(!(tab==RootTab.ANALYSIS && analysisImmersive)) CompactNavigation(tab,{ tab=it; analysisImmersive=false })}){padding->
-            Box(Modifier.padding(if(tab==RootTab.ANALYSIS && analysisImmersive) PaddingValues(0.dp) else padding)){
-                when(tab){
-                    RootTab.HOME->DashboardScreen(vm)
-                    RootTab.ENTRY->EntryScreen(vm){}
-                    RootTab.ANALYSIS->AnalysisScreen(vm,analysisImmersive,{analysisImmersive=it})
-                    RootTab.EXPLORE->ExploreScreen()
-                    RootTab.PROFILE->ProfileScreen(vm)
-                }
+        val content:@Composable ()->Unit={
+            when(tab){
+                RootTab.HOME->DashboardScreen(vm)
+                RootTab.ENTRY->EntryScreen(vm){}
+                RootTab.ANALYSIS->AnalysisScreen(vm,analysisImmersive,{analysisImmersive=it})
+                RootTab.EXPLORE->ExploreScreen()
+                RootTab.PROFILE->ProfileScreen(vm)
+            }
+        }
+        if(compact && !(tab==RootTab.ANALYSIS && analysisImmersive)) {
+            Row(Modifier.fillMaxSize()) {
+                LandscapeNavigation(tab,{tab=it;analysisImmersive=false})
+                VerticalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.45f))
+                Box(Modifier.weight(1f)) { content() }
+            }
+        } else {
+            Scaffold(bottomBar={if(!(tab==RootTab.ANALYSIS && analysisImmersive)) CompactNavigation(tab,{ tab=it; analysisImmersive=false })}){padding->
+                Box(Modifier.padding(if(tab==RootTab.ANALYSIS && analysisImmersive) PaddingValues(0.dp) else padding)){ content() }
             }
         }
     }
     if(updatePrompt) UpdatePrompt(vm,{updatePrompt=false})
+}
+@Composable private fun LandscapeNavigation(selected:RootTab,onSelect:(RootTab)->Unit)=NavigationRail(
+    modifier=Modifier.fillMaxHeight().width(100.dp),
+    containerColor=MaterialTheme.colorScheme.surface,
+    header={ Text("超越",style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary,modifier=Modifier.padding(vertical=18.dp)) }
+){
+    RootTab.entries.forEach { item->
+        NavigationRailItem(selected=item==selected,onClick={onSelect(item)},icon={Icon(TabIcon(item),item.label)},label={Text(item.label)},alwaysShowLabel=true)
+    }
 }
 @Composable private fun CompactNavigation(selected:RootTab,onSelect:(RootTab)->Unit)=Surface(color=MaterialTheme.colorScheme.surface,tonalElevation=2.dp,shadowElevation=8.dp){
     Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal=4.dp,vertical=6.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
