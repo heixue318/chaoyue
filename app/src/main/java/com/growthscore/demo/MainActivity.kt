@@ -2,6 +2,8 @@ package com.growthscore.demo
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -26,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.growthscore.demo.screens.*
 import com.growthscore.demo.ui.*
+import com.growthscore.demo.update.UpdateFlow
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() { override fun onCreate(state: Bundle?) { super.onCreate(state); setContent { GrowthTheme { App() } } } }
@@ -107,4 +110,13 @@ private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录�
     }
 }
 private fun TabIcon(item:RootTab)=when(item){RootTab.HOME->Icons.Default.Home;RootTab.ENTRY->Icons.Default.AddCircle;RootTab.ANALYSIS->Icons.Default.Analytics;RootTab.EXPLORE->Icons.Default.Search;RootTab.PROFILE->Icons.Default.Person}
-@Composable private fun UpdatePrompt(vm:DemoViewModel,dismiss:()->Unit){val context=androidx.compose.ui.platform.LocalContext.current;val status=vm.updateStatus as? UpdateStatus.Found ?: return;val download=vm.downloadStatus;AlertDialog(onDismissRequest=dismiss,title={Text("发现新版本 ${status.release.version}")},text={when(download){is DownloadStatus.Downloading->Column{Text("正在下载：${download.percent}%");LinearProgressIndicator(progress={download.percent/100f},modifier=Modifier.fillMaxWidth().padding(top=10.dp))};is DownloadStatus.Ready->Text("下载完成，请按系统提示确认安装。");DownloadStatus.Idle->Text("已为你准备更新包。下载过程会显示进度，安装仍需通过 Android 系统确认。")}},confirmButton={when(download){is DownloadStatus.Ready->TextButton({context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(download.uri,"application/vnd.android.package-archive").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))}){Text("安装")};is DownloadStatus.Downloading->{};DownloadStatus.Idle->TextButton({vm.downloadUpdate(status.release.apkUrl)}){Text("立即更新")}}},dismissButton={TextButton(dismiss){Text("稍后")}})}
+@Composable private fun UpdatePrompt(vm:DemoViewModel,dismiss:()->Unit){val status=vm.updateStatus as? UpdateStatus.Found ?: return;val download=vm.downloadStatus;AlertDialog(onDismissRequest=dismiss,title={Text("发现新版本 ${status.release.version}")},text={when(download){is DownloadStatus.Downloading->Column{Text("正在下载：${download.percent}%");LinearProgressIndicator(progress={download.percent/100f},modifier=Modifier.fillMaxWidth().padding(top=10.dp))};is DownloadStatus.Ready->Text("下载完成。前往系统安装后，请在系统页面点击“打开”；若未显示，可点“超越已更新”通知返回应用。");DownloadStatus.Idle->Text("已为你准备更新包。下载过程会显示进度，安装仍需通过 Android 系统确认。")}},confirmButton={when(download){is DownloadStatus.Ready->InstallUpdateButton(download.uri);is DownloadStatus.Downloading->{};DownloadStatus.Idle->TextButton({vm.downloadUpdate(status.release.apkUrl)}){Text("立即更新")}}},dismissButton={TextButton(dismiss){Text("稍后")}})}
+
+@Composable fun InstallUpdateButton(uri:android.net.Uri){
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val installer=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){ UpdateFlow.launchSystemInstaller(context,uri) }
+    TextButton({
+        if(android.os.Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED) installer.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        else UpdateFlow.launchSystemInstaller(context,uri)
+    }){Text("前往系统安装")}
+}
