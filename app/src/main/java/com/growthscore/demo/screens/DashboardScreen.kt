@@ -1,12 +1,19 @@
 package com.growthscore.demo.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,16 +51,50 @@ fun DashboardScreen(vm:DemoViewModel) {
 }
 
 @Composable private fun TodayActionCard(vm:DemoViewModel,compact:Boolean) {
-    val tasks=vm.todayPlanTasks(); val done=tasks.count { it.status==PlanTaskStatus.COMPLETED }; val next=tasks.firstOrNull { it.status!=PlanTaskStatus.COMPLETED }
-    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(if(compact)14.dp else 18.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
-        Text("今日最重要的一步",style=MaterialTheme.typography.titleLarge)
-        if(next==null) { Text(if(tasks.isEmpty()) "今天暂时没有计划任务，先录入一次成绩或创建学习计划。" else "今日任务已全部完成，做得很好。",color=MaterialTheme.colorScheme.onPrimaryContainer); if(tasks.isNotEmpty()) LinearProgressIndicator(progress={1f},modifier=Modifier.fillMaxWidth()) }
-        else { Text("${next.subject} · ${next.title}",style=MaterialTheme.typography.titleMedium); Text(next.description.ifBlank { "安排 ${next.minutes} 分钟专注完成。" },style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) { Text("${next.minutes} 分钟 · 已完成 $done / ${tasks.size} 项",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant); Button(onClick={vm.togglePlanTask(next.id)}) { Text("完成这一步") } }
-            LinearProgressIndicator(progress={done.toFloat()/tasks.size},modifier=Modifier.fillMaxWidth())
+    val tasks=vm.todayPlanTasks(); val done=tasks.count { it.status==PlanTaskStatus.COMPLETED }
+    var showSummary by remember { mutableStateOf(false) }
+    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(if(compact)14.dp else 18.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+            Text("今日计划",style=MaterialTheme.typography.titleLarge)
+            if(tasks.isNotEmpty()) Text("$done / ${tasks.size} 项",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)
+        }
+        when {
+            tasks.isEmpty() -> Text("今天暂时没有计划任务，先录入一次成绩或创建学习计划。",color=MaterialTheme.colorScheme.onPrimaryContainer)
+            done==tasks.size -> CompletedTodayCard(tasks,{showSummary=true})
+            else -> TodayTaskCarousel(tasks,done,compact,vm::togglePlanTask)
         }
     } }
+    if(showSummary) TodayCompletionSummary(tasks,{showSummary=false})
 }
+
+@Composable private fun TodayTaskCarousel(tasks:List<com.growthscore.demo.model.PlanTask>,done:Int,compact:Boolean,onComplete:(String)->Unit) {
+    val pagerState=rememberPagerState(pageCount={tasks.size})
+    Text("左右滑动查看全部任务，可自行选择先完成哪一项。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onPrimaryContainer)
+    HorizontalPager(state=pagerState,modifier=Modifier.fillMaxWidth()) { page ->
+        val task=tasks[page]; val completed=task.status==PlanTaskStatus.COMPLETED
+        Surface(color=MaterialTheme.colorScheme.surface.copy(alpha=.88f),shape=MaterialTheme.shapes.large,modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(if(compact)12.dp else 16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) { Text("${task.subject} · ${task.minutes} 分钟",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary); Text("${page+1} / ${tasks.size}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(task.title,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+            Text(task.description.ifBlank { "安排 ${task.minutes} 分钟专注完成。" },style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+                Text(if(completed) "已完成" else "已完成 $done / ${tasks.size} 项",style=MaterialTheme.typography.bodySmall,color=if(completed) Green else MaterialTheme.colorScheme.onSurfaceVariant)
+                if(completed) Text("✓ 已完成",fontWeight=FontWeight.Bold,color=Green) else Button(onClick={onComplete(task.id)}){Text("完成这一步")}
+            }
+        } }
+    }
+    Row(Modifier.fillMaxWidth().padding(top=1.dp),horizontalArrangement=Arrangement.Center) {
+        tasks.indices.forEach { index -> Box(Modifier.padding(horizontal=3.dp).size(if(index==pagerState.currentPage)8.dp else 6.dp).clip(RoundedCornerShape(99.dp)).background(if(index==pagerState.currentPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) }
+    }
+    LinearProgressIndicator(progress={done.toFloat()/tasks.size},modifier=Modifier.fillMaxWidth())
+}
+
+@Composable private fun CompletedTodayCard(tasks:List<com.growthscore.demo.model.PlanTask>,onSummary:()->Unit) = Surface(color=MaterialTheme.colorScheme.surface.copy(alpha=.88f),shape=MaterialTheme.shapes.large,modifier=Modifier.fillMaxWidth().clickable(onClick=onSummary)) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Text("今日任务已全部完成",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold,color=Green)
+    Text("完成 ${tasks.size} 项，共专注 ${tasks.sumOf { it.minutes }} 分钟。点击查看今日完成汇总。",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    LinearProgressIndicator(progress={1f},modifier=Modifier.fillMaxWidth())
+} }
+
+@Composable private fun TodayCompletionSummary(tasks:List<com.growthscore.demo.model.PlanTask>,dismiss:()->Unit) = AlertDialog(onDismissRequest=dismiss,title={Text("今日完成汇总")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) { Text("太棒了！今天完成 ${tasks.size} 项计划，累计 ${tasks.sumOf { it.minutes }} 分钟。",fontWeight=FontWeight.Bold); tasks.forEach { task->Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=MaterialTheme.shapes.small){Text("${task.subject} · ${task.title} · ${task.minutes} 分钟",modifier=Modifier.padding(10.dp),style=MaterialTheme.typography.bodySmall)} } }},confirmButton={TextButton(dismiss){Text("继续保持")}})
 
 @Composable private fun PerformanceCard(name:String,rate:Double,delta:Double,compact:Boolean) = Card(colors=CardDefaults.cardColors(containerColor=PaleBlue),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(if(compact)14.dp else 18.dp)) {
     Text("最近一次考试 · $name",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
