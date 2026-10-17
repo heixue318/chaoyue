@@ -34,8 +34,9 @@ fun AnalysisScreen(vm: DemoViewModel, immersive: Boolean, onImmersiveChange: (Bo
     Box(Modifier.fillMaxSize().pointerInput(immersive) { detectTapGestures(onDoubleTap={ onImmersiveChange(!immersive) }) }) {
         Column(Modifier.fillMaxSize().padding(if(immersive) 0.dp else if(compact)8.dp else 16.dp)) {
             if(!immersive) {
-                Text("分析中心", fontSize = if(compact)22.sp else 28.sp, fontWeight = FontWeight.Bold)
-                ScrollableTabRow(selectedTabIndex = tab,edgePadding=0.dp) {
+                Text("分析中心", style = if(compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall)
+                Text("把成绩变化转化为下一步行动",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                ScrollableTabRow(selectedTabIndex = tab,edgePadding=0.dp,divider={ HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.45f)) }) {
                     Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("综合考试") })
                     Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("单科成长") })
                     Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("目标差距") })

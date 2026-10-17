@@ -76,13 +76,14 @@ private enum class RootTab(val label:String){ HOME("首页"), ENTRY("成绩录�
     }
     if(updatePrompt) UpdatePrompt(vm,{updatePrompt=false})
 }
-@Composable private fun CompactNavigation(selected:RootTab,onSelect:(RootTab)->Unit)=Surface(shadowElevation=3.dp){
-    Row(Modifier.fillMaxWidth().height(48.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
+@Composable private fun CompactNavigation(selected:RootTab,onSelect:(RootTab)->Unit)=Surface(color=MaterialTheme.colorScheme.surface,tonalElevation=2.dp,shadowElevation=8.dp){
+    Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal=4.dp,vertical=6.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
         RootTab.entries.forEach{item->
-            IconButton(onClick={onSelect(item)},modifier=Modifier.size(48.dp)){
-                Surface(shape=MaterialTheme.shapes.large,color=if(item==selected)MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent){
-                    Icon(TabIcon(item),item.label,modifier=Modifier.padding(10.dp).size(25.dp),tint=if(item==selected)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.widthIn(min=52.dp).clickable{onSelect(item)}.padding(vertical=1.dp)){
+                Surface(shape=MaterialTheme.shapes.large,color=if(item==selected)MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent){
+                    Icon(TabIcon(item),item.label,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp).size(22.dp),tint=if(item==selected)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                Text(item.label,style=MaterialTheme.typography.labelSmall,color=if(item==selected)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
             }
         }
     }

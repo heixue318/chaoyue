@@ -34,7 +34,7 @@ import com.growthscore.demo.ui.*
     var update by remember { mutableStateOf(false) }; var backupMessage by remember { mutableStateOf<String?>(null) }; var restoreUri by remember { mutableStateOf<Uri?>(null) }; var clearConfirm by remember { mutableStateOf(false) }
     val importBackup=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { restoreUri=it }
     Column(Modifier.fillMaxSize().padding(if(compact)8.dp else 16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(if(compact)8.dp else 14.dp)) {
-        Text("我的",fontSize=if(compact)22.sp else 28.sp,fontWeight=FontWeight.Bold)
+        Column { Text("我的",style=if(compact)MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall); Text("资料、目标与数据管理",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         Card(Modifier.fillMaxWidth()) { StudentInfo(vm,{studentEdit=true}) }
         Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("学科设置",fontSize=19.sp,fontWeight=FontWeight.Bold); Text(vm.subjects.ifEmpty { listOf("尚未设置学科") }.joinToString("、")); Text("可设置满分、目标和自定义学科",style=MaterialTheme.typography.bodySmall); TextButton({subjectEdit=true}){Text("管理学科与目标")} } }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) { OutlinedButton({update=true}){Text("检查更新")} }

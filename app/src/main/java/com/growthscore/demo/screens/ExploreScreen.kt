@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.growthscore.demo.R
+import com.growthscore.demo.ui.LocalCompactLayout
 
 private data class ReadingBook(val grade:String,val subject:String,val title:String,val author:String,val kind:String,val note:String)
 private data class University(val name:String,val city:String,val tags:String,val majors:String,val enrollment:String,val score:String,val gate:Int,val landmark:Int,val imageSource:String)
@@ -25,13 +26,14 @@ private data class SchoolDetail(val name:String,val tier:String,val majors:Strin
 
 @Composable
 fun ExploreScreen() {
+    val compact = LocalCompactLayout.current
     var section by rememberSaveable { mutableStateOf("书单") }
     var grade by rememberSaveable { mutableStateOf("初一") }
     var subject by rememberSaveable { mutableStateOf("全部") }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("探索",fontSize=28.sp,fontWeight=FontWeight.Bold)
-        Text("阅读、学科方法与升学参考",style=MaterialTheme.typography.bodySmall,color=Color.Gray)
-        Row(Modifier.padding(top=10.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxSize().padding(if(compact)10.dp else 20.dp)) {
+        Text("探索",style=if(compact)MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall)
+        Text("阅读、学科方法与升学参考",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.padding(top=if(compact)6.dp else 10.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             listOf("书单","升学参考").forEach { FilterChip(section==it,{section=it},label={Text(it)}) }
         }
         if(section=="书单") ReadingLibrary(grade,subject,{grade=it},{subject=it}) else UniversityLibrary()
@@ -56,7 +58,7 @@ fun ExploreScreen() {
 
 @Composable private fun ChoiceRow(options:List<String>,selected:String,onSelect:(String)->Unit)=Row(Modifier.fillMaxWidth().padding(top=8.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){options.forEach{FilterChip(selected==it,{onSelect(it)},label={Text(it)})}}
 
-@Composable private fun BookCard(book:ReadingBook)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+@Composable private fun BookCard(book:ReadingBook)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){ Text(book.title,fontWeight=FontWeight.Bold,fontSize=18.sp); AssistChip(onClick={},label={Text(book.subject)}) }
     Text(book.author,color=Color.Gray,style=MaterialTheme.typography.bodySmall)
     Text(book.note)
@@ -85,7 +87,7 @@ fun ExploreScreen() {
     }
 }
 
-@Composable private fun UniversityCard(school:University)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
+@Composable private fun UniversityCard(school:University)=Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
     Text(school.name,fontWeight=FontWeight.Bold,fontSize=21.sp)
     Text("${school.city} · ${school.tags}",color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Medium)
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) { CampusPhoto(school.gate,"${school.name}校门",Modifier.weight(1f)); CampusPhoto(school.landmark,"${school.name}标志性景观",Modifier.weight(1f)) }
